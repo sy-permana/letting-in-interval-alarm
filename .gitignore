@@ -49,3 +49,6 @@ obj/
 
 # Android Profiling
 *.hprof
+
+# Docs
+docs/
