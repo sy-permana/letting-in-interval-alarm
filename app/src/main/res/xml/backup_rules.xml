@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Include the Room database -->
+    <include domain="database" path="letting_in_database" />
+    <include domain="database" path="letting_in_database-shm" />
+    <include domain="database" path="letting_in_database-wal" />
+    
+    <!-- Include shared preferences (if any) -->
+    <include domain="sharedpref" path="." />
+    
+    <!-- Exclude cache and temporary files -->
+    <exclude domain="cache" path="." />
+    <exclude domain="external" path="." />
+</full-backup-content>
