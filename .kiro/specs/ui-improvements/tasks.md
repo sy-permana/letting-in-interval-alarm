@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Create TimeFormatter utility for 24-hour format
+- [x] 1. Create TimeFormatter utility for 24-hour format
   - Create `TimeFormatter` object in `util` package with `format24Hour()` methods for LocalTime and timestamp
   - Add `formatTimeRange()` method for displaying time ranges
   - Add unit tests for TimeFormatter covering midnight, noon, afternoon, and range formatting
