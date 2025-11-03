@@ -129,7 +129,7 @@
   - Add plural resources for interval formatting (minutes, hours)
   - _Requirements: All requirements (localization support)_
 
-- [ ] 8. Update HomeScreen layout
+- [x] 8. Update HomeScreen layout
   - Integrate new AlarmListItem component in alarm list
   - Ensure proper ordering (active alarm first)
   - Add Snackbar host for error messages
