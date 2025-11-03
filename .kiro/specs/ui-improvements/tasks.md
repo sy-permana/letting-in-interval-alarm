@@ -109,14 +109,14 @@
   - Show confirmation dialog and delete if inactive
   - _Requirements: 12.7, 12.8_
 
-- [ ] 6. Implement swipe-to-delete gesture
-- [ ] 6.1 Create SwipeToDeleteWrapper composable
+- [x] 6. Implement swipe-to-delete gesture
+- [x] 6.1 Create SwipeToDeleteWrapper composable
   - Implement SwipeToDismiss with EndToStart direction
   - Add red background with delete icon
   - Make swipe conditional based on alarm active state (enabled parameter)
   - _Requirements: 13.1, 13.2_
 
-- [ ] 6.2 Integrate swipe gesture in AlarmListItem
+- [x] 6.2 Integrate swipe gesture in AlarmListItem
   - Wrap AlarmListItem content with SwipeToDeleteWrapper
   - Pass enabled=false for active alarms
   - Connect onDelete callback to delete confirmation flow

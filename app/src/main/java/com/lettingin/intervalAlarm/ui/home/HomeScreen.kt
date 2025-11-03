@@ -1,5 +1,6 @@
 package com.lettingin.intervalAlarm.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -277,13 +279,18 @@ fun ActiveAlarmCard(
     onViewStatistics: () -> Unit,
     onShowMessage: (String) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    SwipeToDeleteWrapper(
+        enabled = false,  // Active alarms cannot be swiped to delete
+        onDelete = { /* No-op */ },
+        modifier = Modifier.fillMaxWidth()
     ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -534,6 +541,7 @@ fun ActiveAlarmCard(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -547,9 +555,14 @@ fun InactiveAlarmCard(
 ) {
     var showMenu by remember { mutableStateOf(false) }
     
-    Card(
+    SwipeToDeleteWrapper(
+        enabled = !alarm.isActive,
+        onDelete = onDelete,
         modifier = Modifier.fillMaxWidth()
     ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -693,6 +706,7 @@ fun InactiveAlarmCard(
             }
 
         }
+    }
     }
 }
 
@@ -847,5 +861,60 @@ fun ActivationConfirmationDialog(
                 Text("Cancel")
             }
         }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteWrapper(
+    enabled: Boolean,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (!enabled) {
+        content()
+        return
+    }
+    
+    val dismissState = rememberDismissState(
+        confirmValueChange = {
+            if (it == DismissValue.DismissedToStart) {
+                onDelete()
+                false  // Don't auto-dismiss, let parent handle it
+            } else {
+                false
+            }
+        }
+    )
+    
+    // Reset dismiss state after triggering delete
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == DismissValue.DismissedToStart) {
+            dismissState.reset()
+        }
+    }
+    
+    SwipeToDismiss(
+        state = dismissState,
+        directions = setOf(DismissDirection.EndToStart),
+        background = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.error)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.onError
+                )
+            }
+        },
+        dismissContent = { content() },
+        modifier = modifier
     )
 }
