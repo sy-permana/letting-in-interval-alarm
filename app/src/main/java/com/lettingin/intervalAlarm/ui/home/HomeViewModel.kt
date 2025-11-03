@@ -69,6 +69,13 @@ class HomeViewModel @Inject constructor(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
     
+    // Confirmation dialog state
+    private val _showActivationConfirmation = MutableStateFlow(false)
+    val showActivationConfirmation: StateFlow<Boolean> = _showActivationConfirmation.asStateFlow()
+    
+    private val _pendingActivationAlarmId = MutableStateFlow<Long?>(null)
+    val pendingActivationAlarmId: StateFlow<Long?> = _pendingActivationAlarmId.asStateFlow()
+    
     // Jobs for cancellable collectors
     private var activeAlarmStateJob: kotlinx.coroutines.Job? = null
     private var todayStatisticsJob: kotlinx.coroutines.Job? = null
@@ -116,6 +123,42 @@ class HomeViewModel @Inject constructor(
         // Cancel any ongoing collectors
         activeAlarmStateJob?.cancel()
         todayStatisticsJob?.cancel()
+    }
+
+    /**
+     * Handle toggle alarm action with confirmation logic
+     */
+    fun onToggleAlarm(alarmId: Long, shouldActivate: Boolean) {
+        if (shouldActivate) {
+            val currentActive = activeAlarm.value
+            if (currentActive != null && currentActive.id != alarmId) {
+                // Show confirmation dialog
+                _showActivationConfirmation.value = true
+                _pendingActivationAlarmId.value = alarmId
+            } else {
+                // No active alarm, activate directly
+                activateAlarm(alarmId)
+            }
+        } else {
+            deactivateAlarm(alarmId)
+        }
+    }
+    
+    /**
+     * Confirm activation of pending alarm
+     */
+    fun confirmActivation() {
+        val alarmId = _pendingActivationAlarmId.value ?: return
+        dismissActivationConfirmation()
+        activateAlarm(alarmId)
+    }
+    
+    /**
+     * Dismiss activation confirmation dialog
+     */
+    fun dismissActivationConfirmation() {
+        _showActivationConfirmation.value = false
+        _pendingActivationAlarmId.value = null
     }
 
     /**

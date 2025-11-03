@@ -6,7 +6,7 @@
   - Add unit tests for TimeFormatter covering midnight, noon, afternoon, and range formatting
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Update time displays to use 24-hour format
+- [x] 2. Update time displays to use 24-hour format
 - [x] 2.1 Update HomeScreen time displays
   - Replace time formatting in alarm list items to use `TimeFormatter.formatTimeRange()`
   - Update next ring time display to use `TimeFormatter.format24Hour()`
@@ -55,21 +55,21 @@
   - Automatically adjust current interval if it exceeds new maximum
   - _Requirements: 5.1, 5.2, 8.3, 8.4, 8.5_
 
-- [ ] 4. Implement toggle-based alarm activation
-- [ ] 4.1 Add confirmation dialog state to HomeViewModel
+- [x] 4. Implement toggle-based alarm activation
+- [x] 4.1 Add confirmation dialog state to HomeViewModel
   - Add `showActivationConfirmation` boolean to HomeUiState
   - Add `pendingActivationAlarmId` to HomeUiState
   - Implement `onToggleAlarm` method with confirmation logic
   - Implement `confirmActivation` and `dismissActivationConfirmation` methods
   - _Requirements: 10.1, 10.6_
 
-- [ ] 4.2 Create ActivationConfirmationDialog composable
+- [x] 4.2 Create ActivationConfirmationDialog composable
   - Create AlertDialog with swap icon, title, and message
   - Display current active alarm label and new alarm label in message
   - Add confirm and cancel buttons
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
 
-- [ ] 4.3 Update AlarmListItem with Switch component
+- [x] 4.3 Update AlarmListItem with Switch component
   - Replace activation/deactivation buttons with Material3 Switch
   - Position switch to the right of alarm info
   - Connect switch to onToggleActive callback
@@ -77,7 +77,7 @@
   - Apply proper styling (colors, size, touch target)
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 11.1, 11.2, 11.3, 11.4, 11.5_
 
-- [ ] 4.4 Integrate confirmation dialog in HomeScreen
+- [x] 4.4 Integrate confirmation dialog in HomeScreen
   - Display ActivationConfirmationDialog when showActivationConfirmation is true
   - Pass current active alarm label and pending alarm label to dialog
   - Handle confirm action by calling viewModel.confirmActivation()
