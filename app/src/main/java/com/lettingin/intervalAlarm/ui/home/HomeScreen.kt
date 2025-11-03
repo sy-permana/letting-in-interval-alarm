@@ -1,5 +1,6 @@
 package com.lettingin.intervalAlarm.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -9,10 +10,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
+import com.lettingin.intervalAlarm.R
 import com.lettingin.intervalAlarm.data.model.AlarmState
 import com.lettingin.intervalAlarm.data.model.IntervalAlarm
 import com.lettingin.intervalAlarm.util.TimeFormatter
@@ -227,8 +231,8 @@ fun HomeScreen(
     showDeleteDialog?.let { alarmId ->
         AlertDialog(
             onDismissRequest = { showDeleteDialog = null },
-            title = { Text("Delete Alarm") },
-            text = { Text("Are you sure you want to delete this alarm? This action cannot be undone.") },
+            title = { Text(stringResource(R.string.delete_confirmation_title)) },
+            text = { Text(stringResource(R.string.delete_confirmation_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -236,12 +240,12 @@ fun HomeScreen(
                         showDeleteDialog = null
                     }
                 ) {
-                    Text("Delete")
+                    Text(stringResource(R.string.delete_confirmation_confirm))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = null }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.delete_confirmation_cancel))
                 }
             }
         )
@@ -277,13 +281,21 @@ fun ActiveAlarmCard(
     onViewStatistics: () -> Unit,
     onShowMessage: (String) -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    val errorEditMessage = stringResource(R.string.error_deactivate_before_editing)
+    val errorDeleteMessage = stringResource(R.string.error_deactivate_before_deleting)
+    
+    SwipeToDeleteWrapper(
+        enabled = false,  // Active alarms cannot be swiped to delete
+        onDelete = { /* No-op */ },
+        modifier = Modifier.fillMaxWidth()
     ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.elevatedCardColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ),
+            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 4.dp)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -327,7 +339,7 @@ fun ActiveAlarmCard(
                         IconButton(onClick = { showMenu = true }) {
                             Icon(
                                 Icons.Default.MoreVert,
-                                contentDescription = "More options",
+                                contentDescription = stringResource(R.string.menu_more_options),
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                         }
@@ -337,37 +349,37 @@ fun ActiveAlarmCard(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("View Statistics") },
+                                text = { Text(stringResource(R.string.menu_view_statistics)) },
                                 onClick = {
                                     showMenu = false
                                     onViewStatistics()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                    Icon(Icons.Default.BarChart, contentDescription = stringResource(R.string.cd_bar_chart))
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit") },
+                                text = { Text(stringResource(R.string.menu_edit)) },
                                 onClick = {
                                     showMenu = false
                                     if (alarm.isActive) {
-                                        onShowMessage("Deactivate the alarm before editing")
+                                        onShowMessage(errorEditMessage)
                                     } else {
                                         onEdit()
                                     }
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit))
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Delete") },
+                                text = { Text(stringResource(R.string.menu_delete)) },
                                 onClick = {
                                     showMenu = false
-                                    onShowMessage("Deactivate the alarm before deleting")
+                                    onShowMessage(errorDeleteMessage)
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete))
                                 }
                             )
                         }
@@ -534,6 +546,7 @@ fun ActiveAlarmCard(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -546,10 +559,17 @@ fun InactiveAlarmCard(
     onShowMessage: (String) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val errorEditMessage = stringResource(R.string.error_deactivate_before_editing)
+    val errorDeleteMessage = stringResource(R.string.error_deactivate_before_deleting)
     
-    Card(
+    SwipeToDeleteWrapper(
+        enabled = !alarm.isActive,
+        onDelete = onDelete,
         modifier = Modifier.fillMaxWidth()
     ) {
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth()
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -584,7 +604,7 @@ fun InactiveAlarmCard(
                     // Three-dot menu
                     Box {
                         IconButton(onClick = { showMenu = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.menu_more_options))
                         }
                         
                         DropdownMenu(
@@ -592,41 +612,41 @@ fun InactiveAlarmCard(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("View Statistics") },
+                                text = { Text(stringResource(R.string.menu_view_statistics)) },
                                 onClick = {
                                     showMenu = false
                                     onViewStatistics()
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                    Icon(Icons.Default.BarChart, contentDescription = stringResource(R.string.cd_bar_chart))
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Edit") },
+                                text = { Text(stringResource(R.string.menu_edit)) },
                                 onClick = {
                                     showMenu = false
                                     if (alarm.isActive) {
-                                        onShowMessage("Deactivate the alarm before editing")
+                                        onShowMessage(errorEditMessage)
                                     } else {
                                         onEdit()
                                     }
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                    Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.cd_edit))
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Delete") },
+                                text = { Text(stringResource(R.string.menu_delete)) },
                                 onClick = {
                                     showMenu = false
                                     if (alarm.isActive) {
-                                        onShowMessage("Deactivate the alarm before deleting")
+                                        onShowMessage(errorDeleteMessage)
                                     } else {
                                         onDelete()
                                     }
                                 },
                                 leadingIcon = {
-                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.cd_delete))
                                 }
                             )
                         }
@@ -693,6 +713,7 @@ fun InactiveAlarmCard(
             }
 
         }
+    }
     }
 }
 
@@ -817,35 +838,87 @@ fun ActivationConfirmationDialog(
         icon = {
             Icon(
                 imageVector = Icons.Default.SwapHoriz,
-                contentDescription = null,
+                contentDescription = stringResource(R.string.cd_swap_icon),
                 tint = MaterialTheme.colorScheme.primary
             )
         },
         title = {
-            Text("Switch Active Alarm?")
+            Text(stringResource(R.string.activation_confirmation_title))
         },
         text = {
-            Column {
-                Text(
-                    text = "The alarm \"$currentActiveAlarmLabel\" is currently active.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Activating \"$newAlarmLabel\" will deactivate the current alarm.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            Text(
+                text = stringResource(
+                    R.string.activation_confirmation_message,
+                    currentActiveAlarmLabel,
+                    newAlarmLabel
+                ),
+                style = MaterialTheme.typography.bodyMedium
+            )
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("Switch")
+                Text(stringResource(R.string.activation_confirmation_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(stringResource(R.string.activation_confirmation_cancel))
             }
         }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SwipeToDeleteWrapper(
+    enabled: Boolean,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    if (!enabled) {
+        content()
+        return
+    }
+    
+    val dismissState = rememberDismissState(
+        confirmValueChange = {
+            if (it == DismissValue.DismissedToStart) {
+                onDelete()
+                false  // Don't auto-dismiss, let parent handle it
+            } else {
+                false
+            }
+        }
+    )
+    
+    // Reset dismiss state after triggering delete
+    LaunchedEffect(dismissState.currentValue) {
+        if (dismissState.currentValue == DismissValue.DismissedToStart) {
+            dismissState.reset()
+        }
+    }
+    
+    SwipeToDismiss(
+        state = dismissState,
+        directions = setOf(DismissDirection.EndToStart),
+        background = {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.error)
+                    .padding(horizontal = 20.dp),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = MaterialTheme.colorScheme.onError
+                )
+            }
+        },
+        dismissContent = { content() },
+        modifier = modifier
     )
 }
