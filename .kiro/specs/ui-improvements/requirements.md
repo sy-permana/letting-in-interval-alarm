@@ -99,16 +99,17 @@ This specification defines UI/UX improvements for the "Letting In" interval alar
 4. THE Letting_In_App SHALL provide visual feedback when the slider value changes
 5. THE Letting_In_App SHALL maintain the slider and quick options in the same visual section
 
-### Requirement 8: Slider Step Increments
+### Requirement 8: Slider Step Increments and Maximum Interval
 
-**User Story:** As a user, I want the slider to move in reasonable increments so that I can select precise intervals without excessive fine-tuning.
+**User Story:** As a user, I want the slider to move in consistent 5-minute increments so that I can select precise intervals, and I want the maximum interval capped at 12 hours for practical alarm scheduling.
 
 #### Acceptance Criteria
 
-1. WHEN the maximum interval is less than 60 minutes, THE Letting_In_App SHALL use 5-minute step increments for the Slider_Control
-2. WHEN the maximum interval is between 60 and 180 minutes, THE Letting_In_App SHALL use 15-minute step increments for the Slider_Control
-3. WHEN the maximum interval is greater than 180 minutes, THE Letting_In_App SHALL use 30-minute step increments for the Slider_Control
-4. THE Letting_In_App SHALL snap the Slider_Control to the nearest step increment when the user releases the slider
+1. THE Letting_In_App SHALL use fixed 5-minute step increments for the Slider_Control at all time ranges
+2. THE Letting_In_App SHALL snap the Slider_Control to the nearest 5-minute increment when the user adjusts the slider
+3. THE Letting_In_App SHALL calculate the maximum interval as the lesser of 12 hours (720 minutes) or the time range between start and end time
+4. WHEN the time range is 4 hours (e.g., 7am to 11am), THE Letting_In_App SHALL set maximum interval to 240 minutes
+5. WHEN the time range exceeds 12 hours (e.g., 7am to 10pm), THE Letting_In_App SHALL cap maximum interval at 720 minutes (12 hours)
 
 ### Requirement 9: Toggle-Based Alarm Activation
 
