@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import com.lettingin.intervalAlarm.data.model.AlarmState
 import com.lettingin.intervalAlarm.data.model.IntervalAlarm
 import com.lettingin.intervalAlarm.util.TimeFormatter
@@ -45,8 +46,13 @@ fun HomeScreen(
     val permissionChecker = remember {
         com.lettingin.intervalAlarm.util.PermissionChecker(context)
     }
+    
+    // Snackbar state
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Letting In") },
@@ -171,9 +177,14 @@ fun HomeScreen(
                                 todayStatistics = todayStatistics,
                                 onPause = { showPauseDialog = true },
                                 onResume = { viewModel.resumeAlarm() },
-                                onDeactivate = { viewModel.deactivateAlarm(alarm.id) },
+                                onToggleActive = { isActive -> viewModel.onToggleAlarm(alarm.id, isActive) },
                                 onEdit = { onNavigateToEditor(alarm.id) },
-                                onViewStatistics = { onNavigateToStatistics(alarm.id) }
+                                onViewStatistics = { onNavigateToStatistics(alarm.id) },
+                                onShowMessage = { message ->
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(message)
+                                    }
+                                }
                             )
                         }
                     }
@@ -183,10 +194,15 @@ fun HomeScreen(
                     items(inactiveAlarms, key = { it.id }) { alarm ->
                         InactiveAlarmCard(
                             alarm = alarm,
-                            onActivate = { viewModel.activateAlarm(alarm.id) },
+                            onToggleActive = { isActive -> viewModel.onToggleAlarm(alarm.id, isActive) },
                             onEdit = { onNavigateToEditor(alarm.id) },
                             onDelete = { showDeleteDialog = alarm.id },
-                            onViewStatistics = { onNavigateToStatistics(alarm.id) }
+                            onViewStatistics = { onNavigateToStatistics(alarm.id) },
+                            onShowMessage = { message ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(message)
+                                }
+                            }
                         )
                     }
                 }
@@ -230,6 +246,22 @@ fun HomeScreen(
             }
         )
     }
+    
+    // Activation confirmation dialog
+    val showActivationConfirmation by viewModel.showActivationConfirmation.collectAsState()
+    val pendingActivationAlarmId by viewModel.pendingActivationAlarmId.collectAsState()
+    
+    if (showActivationConfirmation) {
+        val currentActiveAlarmLabel = activeAlarm?.label?.ifEmpty { "Interval Alarm" } ?: "Interval Alarm"
+        val pendingAlarmLabel = allAlarms.find { it.id == pendingActivationAlarmId }?.label?.ifEmpty { "Interval Alarm" } ?: "Interval Alarm"
+        
+        ActivationConfirmationDialog(
+            currentActiveAlarmLabel = currentActiveAlarmLabel,
+            newAlarmLabel = pendingAlarmLabel,
+            onConfirm = { viewModel.confirmActivation() },
+            onDismiss = { viewModel.dismissActivationConfirmation() }
+        )
+    }
 }
 
 
@@ -240,15 +272,17 @@ fun ActiveAlarmCard(
     todayStatistics: com.lettingin.intervalAlarm.data.model.AlarmCycleStatistics?,
     onPause: () -> Unit,
     onResume: () -> Unit,
-    onDeactivate: () -> Unit,
+    onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit,
-    onViewStatistics: () -> Unit
+    onViewStatistics: () -> Unit,
+    onShowMessage: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.primaryContainer
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
             modifier = Modifier
@@ -276,13 +310,68 @@ fun ActiveAlarmCard(
                     )
                 }
                 
-                // Deactivate button
-                IconButton(onClick = onDeactivate) {
-                    Icon(
-                        Icons.Default.Close,
-                        contentDescription = "Deactivate",
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                // Switch and three-dot menu
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Switch(
+                        checked = alarm.isActive,
+                        onCheckedChange = onToggleActive,
+                        modifier = Modifier.padding(horizontal = 8.dp)
                     )
+                    
+                    // Three-dot menu
+                    var showMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("View Statistics") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewStatistics()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before editing")
+                                    } else {
+                                        onEdit()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    showMenu = false
+                                    onShowMessage("Deactivate the alarm before deleting")
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                }
+                            )
+                        }
+                    }
                 }
             }
 
@@ -450,11 +539,14 @@ fun ActiveAlarmCard(
 @Composable
 fun InactiveAlarmCard(
     alarm: IntervalAlarm,
-    onActivate: () -> Unit,
+    onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onViewStatistics: () -> Unit
+    onViewStatistics: () -> Unit,
+    onShowMessage: (String) -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -478,13 +570,66 @@ fun InactiveAlarmCard(
                     )
                 }
                 
-                // Action buttons
-                Row {
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                // Switch and three-dot menu
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Switch(
+                        checked = alarm.isActive,
+                        onCheckedChange = onToggleActive,
+                        modifier = Modifier.padding(horizontal = 8.dp)
+                    )
+                    
+                    // Three-dot menu
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("View Statistics") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewStatistics()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before editing")
+                                    } else {
+                                        onEdit()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before deleting")
+                                    } else {
+                                        onDelete()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -547,29 +692,6 @@ fun InactiveAlarmCard(
                 }
             }
 
-            // Action buttons
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Button(
-                    onClick = onActivate,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Activate")
-                }
-
-                OutlinedButton(
-                    onClick = onViewStatistics,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(4.dp))
-                    Text("Stats")
-                }
-            }
         }
     }
 }
@@ -681,4 +803,49 @@ private fun calculateTimeUntilEnd(endTime: java.time.LocalTime): String? {
         minutes > 0 -> "${minutes}m"
         else -> "Less than 1m"
     }
+}
+
+@Composable
+fun ActivationConfirmationDialog(
+    currentActiveAlarmLabel: String,
+    newAlarmLabel: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.SwapHoriz,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text("Switch Active Alarm?")
+        },
+        text = {
+            Column {
+                Text(
+                    text = "The alarm \"$currentActiveAlarmLabel\" is currently active.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Activating \"$newAlarmLabel\" will deactivate the current alarm.",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Switch")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
