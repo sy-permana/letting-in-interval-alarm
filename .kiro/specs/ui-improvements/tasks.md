@@ -122,7 +122,7 @@
   - Connect onDelete callback to delete confirmation flow
   - _Requirements: 13.3, 13.4, 13.5, 13.6_
 
-- [ ] 7. Add string resources for new UI elements
+- [x] 7. Add string resources for new UI elements
   - Add confirmation dialog strings (title, message, buttons)
   - Add menu item strings (View Statistics, Edit, Delete)
   - Add error message strings (deactivate before edit/delete)

@@ -27,7 +27,7 @@ class HomeViewModel @Inject constructor(
     private val statisticsRepository: StatisticsRepository,
     private val alarmScheduler: AlarmScheduler,
     private val permissionChecker: com.lettingin.intervalAlarm.util.PermissionChecker,
-    private val errorHandler: com.lettingin.intervalAlarm.util.ErrorHandler,
+    private val errorHandler: com.l ettingin.intervalAlarm.util.ErrorHandler,
     private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
 ) : ViewModel() {
 

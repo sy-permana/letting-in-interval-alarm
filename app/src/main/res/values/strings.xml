@@ -1,4 +1,71 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Letting In</string>
+    
+    <!-- Activation Confirmation Dialog -->
+    <string name="activation_confirmation_title">Switch Active Alarm?</string>
+    <string name="activation_confirmation_message">The alarm \"%1$s\" is currently active.\n\nActivating \"%2$s\" will deactivate the current alarm.</string>
+    <string name="activation_confirmation_confirm">Switch</string>
+    <string name="activation_confirmation_cancel">Cancel</string>
+    
+    <!-- Delete Confirmation Dialog -->
+    <string name="delete_confirmation_title">Delete Alarm</string>
+    <string name="delete_confirmation_message">Are you sure you want to delete this alarm? This action cannot be undone.</string>
+    <string name="delete_confirmation_confirm">Delete</string>
+    <string name="delete_confirmation_cancel">Cancel</string>
+    
+    <!-- Menu Items -->
+    <string name="menu_view_statistics">View Statistics</string>
+    <string name="menu_edit">Edit</string>
+    <string name="menu_delete">Delete</string>
+    <string name="menu_more_options">More options</string>
+    
+    <!-- Error Messages -->
+    <string name="error_deactivate_before_editing">Deactivate the alarm before editing</string>
+    <string name="error_deactivate_before_deleting">Deactivate the alarm before deleting</string>
+    
+    <!-- Interval Formatting -->
+    <plurals name="interval_minutes">
+        <item quantity="one">%d minute</item>
+        <item quantity="other">%d minutes</item>
+    </plurals>
+    
+    <plurals name="interval_hours">
+        <item quantity="one">%d hour</item>
+        <item quantity="other">%d hours</item>
+    </plurals>
+    
+    <string name="interval_format_mixed">%1$s %2$s</string>
+    <string name="interval_minutes_short">%dm</string>
+    <string name="interval_hours_short">%dh</string>
+    <string name="interval_mixed_short">%1$dh %2$dm</string>
+    
+    <!-- Quick Interval Options -->
+    <string name="quick_interval_15">15m</string>
+    <string name="quick_interval_30">30m</string>
+    <string name="quick_interval_45">45m</string>
+    <string name="quick_interval_60">60m</string>
+    
+    <!-- Content Descriptions -->
+    <string name="cd_delete">Delete</string>
+    <string name="cd_swap_icon">Swap icon</string>
+    <string name="cd_bar_chart">Bar chart</string>
+    <string name="cd_edit">Edit</string>
+    
+    <!-- Alarm Card Labels -->
+    <string name="label_time_range">Time Range</string>
+    <string name="label_interval">Interval</string>
+    <string name="label_active_days">Active Days</string>
+    <string name="label_next_ring">Next Ring</string>
+    <string name="label_time_until_end">Time Until End</string>
+    <string name="label_today_rings">Today\'s Rings</string>
+    <string name="label_user_dismissals">User Dismissals</string>
+    <string name="label_auto_dismissals">Auto Dismissals</string>
+    
+    <!-- Default Alarm Label -->
+    <string name="default_alarm_label">Interval Alarm</string>
+    <string name="active_alarm_label">Active Alarm</string>
+    
+    <!-- Status Labels -->
+    <string name="status_active">ACTIVE</string>
 </resources>
