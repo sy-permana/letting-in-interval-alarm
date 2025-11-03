@@ -6,24 +6,24 @@
   - Add unit tests for TimeFormatter covering midnight, noon, afternoon, and range formatting
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. Update time displays to use 24-hour format
-- [ ] 2.1 Update HomeScreen time displays
+- [x] 2. Update time displays to use 24-hour format
+- [x] 2.1 Update HomeScreen time displays
   - Replace time formatting in alarm list items to use `TimeFormatter.formatTimeRange()`
   - Update next ring time display to use `TimeFormatter.format24Hour()`
   - Update any other time-related displays in HomeScreen
   - _Requirements: 2.1, 2.2, 2.3, 4.1_
 
-- [ ] 2.2 Update AlarmEditorScreen time pickers
+- [x] 2.2 Update AlarmEditorScreen time pickers
   - Configure TimePicker to use 24-hour format by setting `is24Hour = true`
   - Update time display labels to show 24-hour format
   - Test time picker behavior for edge cases (midnight, noon)
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 2.3 Update AlarmRingingActivity time display
+- [x] 2.3 Update AlarmRingingActivity time display
   - Update current time display to use `TimeFormatter.format24Hour()`
   - _Requirements: 4.2_
 
-- [ ] 2.4 Update StatisticsScreen time displays
+- [x] 2.4 Update StatisticsScreen time displays
   - Update any time-related displays in statistics to use 24-hour format
   - _Requirements: 4.3_
 
