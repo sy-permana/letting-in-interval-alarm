@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lettingin.intervalAlarm.data.model.AlarmState
 import com.lettingin.intervalAlarm.data.model.IntervalAlarm
+import com.lettingin.intervalAlarm.util.TimeFormatter
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDateTime
@@ -299,7 +300,7 @@ fun ActiveAlarmCard(
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
                     )
                     Text(
-                        text = "${formatTime(alarm.startTime)} - ${formatTime(alarm.endTime)}",
+                        text = TimeFormatter.formatTimeRange(alarm.startTime, alarm.endTime),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -361,7 +362,7 @@ fun ActiveAlarmCard(
                     state.nextScheduledRingTime?.let { nextRing ->
                         StatisticRow(
                             label = "Next Ring",
-                            value = formatDateTime(nextRing),
+                            value = TimeFormatter.format24Hour(nextRing),
                             icon = Icons.Default.Schedule
                         )
                     }
@@ -500,7 +501,7 @@ fun InactiveAlarmCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "${formatTime(alarm.startTime)} - ${formatTime(alarm.endTime)}",
+                        text = TimeFormatter.formatTimeRange(alarm.startTime, alarm.endTime),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -657,24 +658,12 @@ fun PauseDialog(
 }
 
 // Utility functions
-private fun formatTime(time: java.time.LocalTime): String {
-    return time.format(DateTimeFormatter.ofPattern("h:mm a"))
-}
-
 private fun formatInterval(minutes: Int): String {
     return when {
         minutes < 60 -> "$minutes min"
         minutes % 60 == 0 -> "${minutes / 60} hr"
         else -> "${minutes / 60}h ${minutes % 60}m"
     }
-}
-
-private fun formatDateTime(timestamp: Long): String {
-    val dateTime = LocalDateTime.ofInstant(
-        Instant.ofEpochMilli(timestamp),
-        ZoneId.systemDefault()
-    )
-    return dateTime.format(DateTimeFormatter.ofPattern("h:mm a"))
 }
 
 private fun calculateTimeUntilEnd(endTime: java.time.LocalTime): String? {

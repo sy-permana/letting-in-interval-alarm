@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lettingin.intervalAlarm.data.model.NotificationType
+import com.lettingin.intervalAlarm.util.TimeFormatter
 import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.format.TextStyle
@@ -137,7 +138,7 @@ fun AlarmEditorScreen(
                                     style = MaterialTheme.typography.labelSmall
                                 )
                                 Text(
-                                    text = formatTime(alarmState?.startTime ?: LocalTime.of(9, 0)),
+                                    text = TimeFormatter.format24Hour(alarmState?.startTime ?: LocalTime.of(9, 0)),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             }
@@ -157,7 +158,7 @@ fun AlarmEditorScreen(
                                     style = MaterialTheme.typography.labelSmall
                                 )
                                 Text(
-                                    text = formatTime(alarmState?.endTime ?: LocalTime.of(17, 0)),
+                                    text = TimeFormatter.format24Hour(alarmState?.endTime ?: LocalTime.of(17, 0)),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                             }
@@ -606,7 +607,7 @@ fun TimePickerDialog(
     val timePickerState = rememberTimePickerState(
         initialHour = initialTime.hour,
         initialMinute = initialTime.minute,
-        is24Hour = false
+        is24Hour = true
     )
 
     AlertDialog(
@@ -633,10 +634,6 @@ fun TimePickerDialog(
 }
 
 // Utility functions
-private fun formatTime(time: LocalTime): String {
-    return time.format(java.time.format.DateTimeFormatter.ofPattern("h:mm a"))
-}
-
 private fun formatNotificationType(type: NotificationType): String {
     return when (type) {
         NotificationType.FULL_SCREEN -> "Full Screen"
