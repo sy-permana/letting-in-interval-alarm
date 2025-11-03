@@ -175,22 +175,36 @@ private fun IntervalSlider(
     maxInterval: Int,
     onIntervalChange: (Int) -> Unit
 ) {
-    val stepSize = calculateStepSize(maxInterval)
+    // Fixed 5-minute step size for all time ranges
+    val stepSize = 5
     
     Slider(
         value = currentInterval.toFloat(),
-        onValueChange = { onIntervalChange(it.toInt()) },
+        onValueChange = { value ->
+            // Snap to nearest 5-minute step
+            val snappedValue = (value / stepSize).roundToInt() * stepSize
+            onIntervalChange(snappedValue.coerceIn(minInterval, maxInterval))
+        },
         valueRange = minInterval.toFloat()..maxInterval.toFloat(),
         steps = ((maxInterval - minInterval) / stepSize) - 1,
         modifier = Modifier.fillMaxWidth()
     )
-}
-
-private fun calculateStepSize(maxInterval: Int): Int {
-    return when {
-        maxInterval < 60 -> 5
-        maxInterval <= 180 -> 15
-        else -> 30
+    
+    // Min/max labels
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "${minInterval}m",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = "${maxInterval}m",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -209,8 +223,14 @@ private fun formatInterval(minutes: Int): String {
 
 **Integration:**
 - Replace existing interval text field in AlarmEditorScreen
-- Calculate maxInterval based on start/end time difference
+- Calculate maxInterval based on start/end time difference, capped at 12 hours (720 minutes)
+- Use fixed 5-minute step increments for all time ranges
 - Preserve existing validation logic
+
+**Maximum Interval Calculation:**
+- maxInterval = min(timeRangeBetweenStartAndEnd, 720 minutes)
+- Example: 7am to 11am (4 hours) → maxInterval = 240 minutes
+- Example: 7am to 10pm (15 hours) → maxInterval = 720 minutes (capped at 12 hours)
 
 
 ### 3. Alarm List Item with Toggle and Menu
@@ -844,7 +864,7 @@ class AlarmEditorViewModel(...) : ViewModel() {
     private fun recalculateMaxInterval() {
         val state = _uiState.value
         val duration = Duration.between(state.startTime, state.endTime)
-        val maxMinutes = if (duration.isNegative) {
+        val timeRangeMinutes = if (duration.isNegative) {
             // End time is next day
             Duration.between(state.startTime, LocalTime.MAX)
                 .plus(Duration.between(LocalTime.MIN, state.endTime))
@@ -852,6 +872,9 @@ class AlarmEditorViewModel(...) : ViewModel() {
         } else {
             duration.toMinutes()
         }.toInt()
+        
+        // Cap at 12 hours (720 minutes) or time range, whichever is smaller
+        val maxMinutes = minOf(timeRangeMinutes, 720)
         
         _uiState.update { 
             it.copy(

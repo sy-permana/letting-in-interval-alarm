@@ -6,7 +6,7 @@
   - Add unit tests for TimeFormatter covering midnight, noon, afternoon, and range formatting
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [x] 2. Update time displays to use 24-hour format
+- [ ] 2. Update time displays to use 24-hour format
 - [x] 2.1 Update HomeScreen time displays
   - Replace time formatting in alarm list items to use `TimeFormatter.formatTimeRange()`
   - Update next ring time display to use `TimeFormatter.format24Hour()`
@@ -27,32 +27,33 @@
   - Update any time-related displays in statistics to use 24-hour format
   - _Requirements: 4.3_
 
-- [ ] 3. Create IntervalSelector component
-- [ ] 3.1 Implement IntervalSlider composable
-  - Create slider component with dynamic step size calculation based on max interval
-  - Implement step size logic: 5 min (<60), 15 min (60-180), 30 min (>180)
+- [x] 3. Create IntervalSelector component
+- [x] 3.1 Implement IntervalSlider composable
+  - Create slider component with fixed 5-minute step size for all time ranges
+  - Implement snap-to-step logic for 5-minute increments
   - Add min/max labels below slider
-  - _Requirements: 5.1, 5.2, 5.3, 8.1, 8.2, 8.3, 8.4_
+  - _Requirements: 5.1, 5.2, 5.3, 8.1, 8.2_
 
-- [ ] 3.2 Implement QuickIntervalOptions composable
+- [x] 3.2 Implement QuickIntervalOptions composable
   - Create horizontal row of FilterChip components for 15, 30, 45, 60 minute presets
   - Filter options based on maxInterval (only show valid options)
   - Implement selection highlighting for current interval
   - Add click handlers to update interval value
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 3.3 Implement IntervalSelector composite component
+- [x] 3.3 Implement IntervalSelector composite component
   - Combine current interval display, quick options, and slider into single component
   - Add interval formatting helper function (handles minutes, hours, mixed)
   - Ensure proper spacing and layout per design specifications
   - _Requirements: 5.4, 7.1, 7.2, 7.3, 7.4, 7.5_
 
-- [ ] 3.4 Integrate IntervalSelector into AlarmEditorScreen
+- [x] 3.4 Integrate IntervalSelector into AlarmEditorScreen
   - Replace existing interval text field with IntervalSelector component
   - Connect to AlarmEditorViewModel's updateInterval method
-  - Ensure maxInterval is calculated from start/end time difference
+  - Ensure maxInterval is calculated from start/end time difference, capped at 12 hours (720 minutes)
   - Update interval when start/end time changes
-  - _Requirements: 5.1, 5.2_
+  - Automatically adjust current interval if it exceeds new maximum
+  - _Requirements: 5.1, 5.2, 8.3, 8.4, 8.5_
 
 - [ ] 4. Implement toggle-based alarm activation
 - [ ] 4.1 Add confirmation dialog state to HomeViewModel

@@ -41,6 +41,10 @@ class AlarmEditorViewModel @Inject constructor(
     private val _alarmState = MutableStateFlow<IntervalAlarm?>(createDefaultAlarm())
     val alarmState: StateFlow<IntervalAlarm?> = _alarmState.asStateFlow()
 
+    // Maximum interval based on time range
+    private val _maxInterval = MutableStateFlow(480) // Default 8 hours
+    val maxInterval: StateFlow<Int> = _maxInterval.asStateFlow()
+
     // Validation state
     private val _validationResult = MutableStateFlow(ValidationResult(isValid = true))
     val validationResult: StateFlow<ValidationResult> = _validationResult.asStateFlow()
@@ -85,6 +89,7 @@ class AlarmEditorViewModel @Inject constructor(
                     _isLoading.value = true
                     alarmRepository.getAlarmById(alarmId).collect { alarm ->
                         _alarmState.value = alarm
+                        recalculateMaxInterval()
                         _isLoading.value = false
                     }
                 } else {
@@ -96,6 +101,7 @@ class AlarmEditorViewModel @Inject constructor(
                             notificationType = settings.defaultNotificationType
                         )
                     }
+                    recalculateMaxInterval()
                 }
             } catch (e: Exception) {
                 _isLoading.value = false
@@ -119,6 +125,7 @@ class AlarmEditorViewModel @Inject constructor(
      */
     fun updateStartTime(time: LocalTime) {
         _alarmState.value = _alarmState.value?.copy(startTime = time)
+        recalculateMaxInterval()
     }
 
     /**
@@ -126,6 +133,35 @@ class AlarmEditorViewModel @Inject constructor(
      */
     fun updateEndTime(time: LocalTime) {
         _alarmState.value = _alarmState.value?.copy(endTime = time)
+        recalculateMaxInterval()
+    }
+
+    /**
+     * Recalculate maximum interval based on time range
+     * Capped at 12 hours (720 minutes) or the time range, whichever is smaller
+     */
+    private fun recalculateMaxInterval() {
+        _alarmState.value?.let { alarm ->
+            val duration = java.time.Duration.between(alarm.startTime, alarm.endTime)
+            val timeRangeMinutes = if (duration.isNegative) {
+                // End time is next day
+                java.time.Duration.between(alarm.startTime, LocalTime.MAX)
+                    .plus(java.time.Duration.between(LocalTime.MIN, alarm.endTime))
+                    .toMinutes()
+            } else {
+                duration.toMinutes()
+            }.toInt()
+            
+            // Cap at 12 hours (720 minutes) or time range, whichever is smaller
+            val maxMinutes = minOf(timeRangeMinutes, 720)
+            
+            _maxInterval.value = maxMinutes
+            
+            // Adjust current interval if it exceeds new max
+            if (alarm.intervalMinutes > maxMinutes) {
+                _alarmState.value = alarm.copy(intervalMinutes = maxMinutes)
+            }
+        }
     }
 
     /**

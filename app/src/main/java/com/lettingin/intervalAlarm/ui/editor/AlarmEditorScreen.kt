@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lettingin.intervalAlarm.data.model.NotificationType
+import com.lettingin.intervalAlarm.ui.components.IntervalSelector
 import com.lettingin.intervalAlarm.util.TimeFormatter
 import java.time.DayOfWeek
 import java.time.LocalTime
@@ -30,6 +31,7 @@ fun AlarmEditorScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val alarmState by viewModel.alarmState.collectAsState()
+    val maxInterval by viewModel.maxInterval.collectAsState()
     val validationResult by viewModel.validationResult.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
@@ -210,47 +212,20 @@ fun AlarmEditorScreen(
                             style = MaterialTheme.typography.titleMedium
                         )
 
-                        var intervalText by remember(alarmState?.intervalMinutes) {
-                            mutableStateOf((alarmState?.intervalMinutes ?: 30).toString())
-                        }
-
-                        OutlinedTextField(
-                            value = intervalText,
-                            onValueChange = { newValue ->
-                                intervalText = newValue
-                                newValue.toIntOrNull()?.let { minutes ->
-                                    if (minutes > 0) {
-                                        viewModel.updateInterval(minutes)
-                                    }
-                                }
-                            },
-                            label = { Text("Minutes") },
-                            modifier = Modifier.fillMaxWidth(),
-                            isError = validationResult.errors.containsKey("interval"),
-                            supportingText = {
-                                validationResult.errors["interval"]?.let { error ->
-                                    Text(error, color = MaterialTheme.colorScheme.error)
-                                } ?: Text("Minimum 5 minutes")
-                            },
-                            singleLine = true
+                        IntervalSelector(
+                            currentInterval = alarmState?.intervalMinutes ?: 30,
+                            minInterval = 5,
+                            maxInterval = maxInterval,
+                            onIntervalChange = { viewModel.updateInterval(it) },
+                            modifier = Modifier.fillMaxWidth()
                         )
 
-                        // Quick interval buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            listOf(15, 30, 45, 60).forEach { minutes ->
-                                FilterChip(
-                                    selected = alarmState?.intervalMinutes == minutes,
-                                    onClick = {
-                                        viewModel.updateInterval(minutes)
-                                        intervalText = minutes.toString()
-                                    },
-                                    label = { Text("${minutes}m") },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
+                        validationResult.errors["interval"]?.let { error ->
+                            Text(
+                                text = error,
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
                         }
                     }
                 }
