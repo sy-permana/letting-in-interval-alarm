@@ -84,26 +84,26 @@
   - Handle dismiss action by calling viewModel.dismissActivationConfirmation()
   - _Requirements: 10.4, 10.5, 10.7_
 
-- [ ] 5. Implement three-dot menu for alarm actions
-- [ ] 5.1 Add three-dot menu to AlarmListItem
+- [x] 5. Implement three-dot menu for alarm actions
+- [x] 5.1 Add three-dot menu to AlarmListItem
   - Add IconButton with MoreVert icon to the right of Switch
   - Add menu state management (showMenu boolean)
   - Position menu button with proper spacing
   - _Requirements: 12.1, 12.2_
 
-- [ ] 5.2 Implement DropdownMenu with actions
+- [x] 5.2 Implement DropdownMenu with actions
   - Create DropdownMenu with three options: View Statistics, Edit, Delete
   - Add appropriate icons for each menu item
   - Implement click handlers for each option
   - _Requirements: 12.3, 12.4_
 
-- [ ] 5.3 Add edit restriction logic for active alarms
+- [x] 5.3 Add edit restriction logic for active alarms
   - Check if alarm is active when Edit is selected
   - Show Snackbar message "Deactivate the alarm before editing" if active
   - Navigate to editor screen if inactive
   - _Requirements: 12.5, 12.6_
 
-- [ ] 5.4 Add delete restriction logic for active alarms
+- [x] 5.4 Add delete restriction logic for active alarms
   - Check if alarm is active when Delete is selected
   - Show Snackbar message "Deactivate the alarm before deleting" if active
   - Show confirmation dialog and delete if inactive

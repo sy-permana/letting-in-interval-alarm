@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.launch
 import com.lettingin.intervalAlarm.data.model.AlarmState
 import com.lettingin.intervalAlarm.data.model.IntervalAlarm
 import com.lettingin.intervalAlarm.util.TimeFormatter
@@ -45,8 +46,13 @@ fun HomeScreen(
     val permissionChecker = remember {
         com.lettingin.intervalAlarm.util.PermissionChecker(context)
     }
+    
+    // Snackbar state
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("Letting In") },
@@ -173,7 +179,12 @@ fun HomeScreen(
                                 onResume = { viewModel.resumeAlarm() },
                                 onToggleActive = { isActive -> viewModel.onToggleAlarm(alarm.id, isActive) },
                                 onEdit = { onNavigateToEditor(alarm.id) },
-                                onViewStatistics = { onNavigateToStatistics(alarm.id) }
+                                onViewStatistics = { onNavigateToStatistics(alarm.id) },
+                                onShowMessage = { message ->
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(message)
+                                    }
+                                }
                             )
                         }
                     }
@@ -186,7 +197,12 @@ fun HomeScreen(
                             onToggleActive = { isActive -> viewModel.onToggleAlarm(alarm.id, isActive) },
                             onEdit = { onNavigateToEditor(alarm.id) },
                             onDelete = { showDeleteDialog = alarm.id },
-                            onViewStatistics = { onNavigateToStatistics(alarm.id) }
+                            onViewStatistics = { onNavigateToStatistics(alarm.id) },
+                            onShowMessage = { message ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(message)
+                                }
+                            }
                         )
                     }
                 }
@@ -258,7 +274,8 @@ fun ActiveAlarmCard(
     onResume: () -> Unit,
     onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit,
-    onViewStatistics: () -> Unit
+    onViewStatistics: () -> Unit,
+    onShowMessage: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -293,22 +310,67 @@ fun ActiveAlarmCard(
                     )
                 }
                 
-                // Switch and action buttons
+                // Switch and three-dot menu
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Switch(
                         checked = alarm.isActive,
                         onCheckedChange = onToggleActive,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
-                    IconButton(onClick = onEdit) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "Edit",
-                            tint = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
+                    
+                    // Three-dot menu
+                    var showMenu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More options",
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("View Statistics") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewStatistics()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before editing")
+                                    } else {
+                                        onEdit()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    showMenu = false
+                                    onShowMessage("Deactivate the alarm before deleting")
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -480,8 +542,11 @@ fun InactiveAlarmCard(
     onToggleActive: (Boolean) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onViewStatistics: () -> Unit
+    onViewStatistics: () -> Unit,
+    onShowMessage: (String) -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+    
     Card(
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -505,21 +570,66 @@ fun InactiveAlarmCard(
                     )
                 }
                 
-                // Switch and action buttons
+                // Switch and three-dot menu
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Switch(
                         checked = alarm.isActive,
                         onCheckedChange = onToggleActive,
                         modifier = Modifier.padding(horizontal = 8.dp)
                     )
-                    IconButton(onClick = onEdit) {
-                        Icon(Icons.Default.Edit, contentDescription = "Edit")
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(Icons.Default.Delete, contentDescription = "Delete")
+                    
+                    // Three-dot menu
+                    Box {
+                        IconButton(onClick = { showMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More options")
+                        }
+                        
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("View Statistics") },
+                                onClick = {
+                                    showMenu = false
+                                    onViewStatistics()
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.BarChart, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Edit") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before editing")
+                                    } else {
+                                        onEdit()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Edit, contentDescription = null)
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Delete") },
+                                onClick = {
+                                    showMenu = false
+                                    if (alarm.isActive) {
+                                        onShowMessage("Deactivate the alarm before deleting")
+                                    } else {
+                                        onDelete()
+                                    }
+                                },
+                                leadingIcon = {
+                                    Icon(Icons.Default.Delete, contentDescription = null)
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -582,15 +692,6 @@ fun InactiveAlarmCard(
                 }
             }
 
-            // Action buttons
-            OutlinedButton(
-                onClick = onViewStatistics,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Default.BarChart, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("View Statistics")
-            }
         }
     }
 }
