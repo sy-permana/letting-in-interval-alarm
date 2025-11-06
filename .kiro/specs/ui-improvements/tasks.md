@@ -136,7 +136,7 @@
   - Test list performance with multiple alarms
   - _Requirements: 9.1, 10.7, 12.5, 12.6, 12.7, 12.8_
 
-- [ ] 9. Verify backward compatibility
+- [x] 9. Verify backward compatibility
   - Test that existing alarms load and display correctly
   - Verify alarm scheduling logic unchanged
   - Confirm single active alarm enforcement still works
@@ -144,7 +144,7 @@
   - Verify all time calculations work with 24-hour format
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5_
 
-- [ ] 10. End-to-end testing
+- [x] 10. End-to-end testing
   - Test complete flow: create alarm, activate with toggle, confirm switch
   - Test interval selection with both slider and quick options
   - Test swipe-to-delete on inactive alarms

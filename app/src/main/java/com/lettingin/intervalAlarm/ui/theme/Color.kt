@@ -2,11 +2,14 @@ package com.lettingin.intervalAlarm.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
+// Brand color - from app icon
+val BrandRed = Color(0xFFFF3B4A)
+
 // Light theme colors
-val Primary = Color(0xFF6750A4)
+val Primary = Color(0xFFFF3B4A)
 val OnPrimary = Color(0xFFFFFFFF)
-val PrimaryContainer = Color(0xFFEADDFF)
-val OnPrimaryContainer = Color(0xFF21005D)
+val PrimaryContainer = Color(0xFFFFDADD)
+val OnPrimaryContainer = Color(0xFF410002)
 
 val Secondary = Color(0xFF625B71)
 val OnSecondary = Color(0xFFFFFFFF)
@@ -34,10 +37,10 @@ val Outline = Color(0xFF79747E)
 val OutlineVariant = Color(0xFFCAC4D0)
 
 // Dark theme colors
-val DarkPrimary = Color(0xFFD0BCFF)
-val DarkOnPrimary = Color(0xFF381E72)
-val DarkPrimaryContainer = Color(0xFF4F378B)
-val DarkOnPrimaryContainer = Color(0xFFEADDFF)
+val DarkPrimary = Color(0xFFFFB3B8)
+val DarkOnPrimary = Color(0xFF680009)
+val DarkPrimaryContainer = Color(0xFF930014)
+val DarkOnPrimaryContainer = Color(0xFFFFDADD)
 
 val DarkSecondary = Color(0xFFCCC2DC)
 val DarkOnSecondary = Color(0xFF332D41)

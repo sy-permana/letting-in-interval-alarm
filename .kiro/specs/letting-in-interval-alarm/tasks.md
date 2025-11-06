@@ -422,7 +422,7 @@
   - Test keyboard navigation
   - _Requirements: All requirements_
 
-- [ ]* 10.5 Create app icon and branding
+- [x]* 10.5 Create app icon and branding
   - Design app icon following Material Design guidelines
   - Create adaptive icon for Android 8+
   - Add app name and branding to launcher

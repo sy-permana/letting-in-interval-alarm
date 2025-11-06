@@ -187,7 +187,7 @@ class AlarmNotificationService : Service() {
         )
 
         val builder = NotificationCompat.Builder(this, channelId)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(displayLabel)
             .setContentText("Tap to dismiss")
             .setPriority(NotificationCompat.PRIORITY_MAX) // Changed to MAX for full-screen
@@ -196,8 +196,8 @@ class AlarmNotificationService : Service() {
             .setOngoing(true)
             .setContentIntent(fullScreenPendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // Show on lock screen
-            .addAction(R.drawable.ic_launcher_foreground, "Dismiss", dismissPendingIntent)
-            .addAction(R.drawable.ic_launcher_foreground, "Stop for Day", stopForDayPendingIntent)
+            .addAction(R.drawable.ic_notification, "Dismiss", dismissPendingIntent)
+            .addAction(R.drawable.ic_notification, "Stop for Day", stopForDayPendingIntent)
 
         // Add full-screen intent for locked screen - this is what makes it show over lock screen
         if (notificationType == NotificationType.FULL_SCREEN) {
