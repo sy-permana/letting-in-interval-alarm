@@ -2,12 +2,45 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:viewportWidth="500"
+    android:viewportHeight="500">
+    
+    <!-- Extracted from untitled_design__1_.xml - Door frame icon -->
+    <!-- Main door frame structure (primary red) -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30C40.7,30 30,40.7 30,54C30,67.3 40.7,78 54,78C67.3,78 78,67.3 78,54C78,40.7 67.3,30 54,30ZM54,72C44,72 36,64 36,54C36,44 44,36 54,36C64,36 72,44 72,54C72,64 64,72 54,72Z"/>
+        android:fillColor="#DD3431"
+        android:pathData="M274.5 100L297.5 100L299 101.5L299 264.5L300 265.5L300 279.5L299 280.5L299 297.5L300 298.5L300 343.5L299 344.5L299 359.5L300 360.5L300 384.5L299 385.5L299 402.5L300 403.5L300 411.5L299 417Q295.7 419.1 287.5 418L286 416.5L285 346.5L286 345.5L286 280.5L285 279.5L285 250.5L286 249.5L286 127.5L285 126.5L285 117.5L282.5 115L271.5 117L249.5 126L225.5 133L202.5 143L189.5 146L184 150.5L183 152.5L183 364.5L181.5 366Q176.9 367.4 179 361.5L178 360.5L178 138.5L180 133L274.5 100Z"/>
+    
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,42L54,54L66,54"/>
+        android:fillColor="#DD3431"
+        android:pathData="M165.5 140L168 141.5L169 143.5L169 360.5L168 363L164 363L164 361.5L163 360.5L163 142.5L165.5 140Z"/>
+    
+    <!-- Shading and depth (darker red) -->
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M272.5 98L297.5 98L300 99Q302.4 102.9 301 112.5L300 113.5L299.5 265L299 101.5L297.5 100L274.5 100L269.5 101L253.5 108L229.5 115L211.5 123L189.5 129L180 133L178 138.5L177.5 308L177 135.5L180.5 131L216.5 119L226.5 114L247.5 108L272.5 98Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M279.5 115Q284.3 114.3 285 117.5L285 126.5L286 127.5L286 249.5L285 250.5L285 279.5L286 280.5L286 345.5L285 346.5L285 387.5L286 388.5L286 416.5L287.5 418Q295.7 419.1 299 417L299.5 412L300 417.5Q296.6 422.1 286.5 420L284 415.5L284 119.5L281.5 117L278.5 117L261.5 124L235.5 132L214.5 141L187.5 149L185 151.5L185 166.5L184 167.5L184 366.5L182.5 368Q178.8 368.8 178 366.5L177 352.5L178 352.5L179 366L183 364.5L183 152.5L187.5 147L202.5 143L225.5 133L228.5 133L231.5 131L249.5 126L259.5 121L279.5 115Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M164.5 137Q169 136 170 138.5L169.5 152L169 143.5L166.5 140L163 142.5L163 360.5L164 363L168 363L168 361.5L169 361.5Q169.5 365.5 166.5 366L163 365L161 360.5L161 184.5L160 183.5L160 153.5L161 152.5L161 141.5L164.5 137Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M299.5 280L300 297.5L299 297.5L299.5 280Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M177.5 312L178 340.5L177 340.5L177.5 312Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M299.5 344L300 359.5L299 359.5L299.5 344Z"/>
+    
+    <path
+        android:fillColor="#AB3635"
+        android:pathData="M299.5 385L300 402.5L299 402.5L299.5 385Z"/>
 </vector>

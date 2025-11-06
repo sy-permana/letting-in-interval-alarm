@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="500"
+    android:viewportHeight="500">
+    
+    <!-- Monochrome version for Android 13+ themed icons -->
+    <!-- Extracted from untitled_design__1_.xml - Door frame icon -->
+    
+    <!-- Main door frame structure (simplified for monochrome) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M274.5 100L297.5 100L299 101.5L299 264.5L300 265.5L300 279.5L299 280.5L299 297.5L300 298.5L300 343.5L299 344.5L299 359.5L300 360.5L300 384.5L299 385.5L299 402.5L300 403.5L300 411.5L299 417Q295.7 419.1 287.5 418L286 416.5L285 346.5L286 345.5L286 280.5L285 279.5L285 250.5L286 249.5L286 127.5L285 126.5L285 117.5L282.5 115L271.5 117L249.5 126L225.5 133L202.5 143L189.5 146L184 150.5L183 152.5L183 364.5L181.5 366Q176.9 367.4 179 361.5L178 360.5L178 138.5L180 133L274.5 100Z"/>
+    
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M165.5 140L168 141.5L169 143.5L169 360.5L168 363L164 363L164 361.5L163 360.5L163 142.5L165.5 140Z"/>
+</vector>
