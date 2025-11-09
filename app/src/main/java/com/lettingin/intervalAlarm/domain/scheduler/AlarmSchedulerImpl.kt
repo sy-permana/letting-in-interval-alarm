@@ -26,7 +26,8 @@ class AlarmSchedulerImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val alarmRepository: AlarmRepository,
     private val alarmStateRepository: AlarmStateRepository,
-    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger,
+    private val permissionChecker: com.lettingin.intervalAlarm.util.PermissionChecker
 ) : AlarmScheduler {
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -35,6 +36,11 @@ class AlarmSchedulerImpl @Inject constructor(
         private const val TAG = "AlarmSchedulerImpl"
         const val EXTRA_ALARM_ID = "alarm_id"
         const val EXTRA_IS_RESUME = "is_resume"
+        private const val MAX_RETRY_ATTEMPTS = 3
+        private const val RETRY_DELAY_MS = 500L
+        private const val MAX_FUTURE_TIME_YEARS = 1
+        private const val MIN_INTERVAL_MINUTES = 1
+        private const val MAX_INTERVAL_MINUTES = 1440 // 24 hours
     }
 
     override suspend fun scheduleAlarm(alarm: IntervalAlarm) {
@@ -42,18 +48,11 @@ class AlarmSchedulerImpl @Inject constructor(
         appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG, 
             "Scheduling alarm: id=${alarm.id}, label='${alarm.label}'")
         
-        // Validate alarm configuration
-        if (alarm.selectedDays.isEmpty()) {
-            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
-                "Cannot schedule alarm with no selected days: id=${alarm.id}")
-            throw IllegalArgumentException("Alarm must have at least one selected day")
-        }
+        // Check permissions before attempting to schedule
+        validateSchedulingPermissions()
         
-        if (alarm.intervalMinutes <= 0) {
-            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
-                "Cannot schedule alarm with invalid interval: id=${alarm.id}, interval=${alarm.intervalMinutes}")
-            throw IllegalArgumentException("Alarm interval must be positive")
-        }
+        // Validate alarm configuration
+        validateAlarmConfiguration(alarm)
         
         // Calculate the next ring time
         val nextRingTime = calculateNextRingTime(alarm, System.currentTimeMillis())
@@ -65,12 +64,8 @@ class AlarmSchedulerImpl @Inject constructor(
             return
         }
         
-        // Validate next ring time is in the future
-        if (nextRingTime <= System.currentTimeMillis()) {
-            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
-                "Calculated next ring time is not in the future: id=${alarm.id}, time=$nextRingTime")
-            return
-        }
+        // Validate calculated next ring time
+        validateNextRingTime(nextRingTime, alarm.id)
         
         // Update alarm state
         val alarmState = AlarmState(
@@ -108,62 +103,14 @@ class AlarmSchedulerImpl @Inject constructor(
             throw IllegalArgumentException("Next ring time must be positive")
         }
         
-        // Validate next ring time is in the future
-        val currentTime = System.currentTimeMillis()
-        if (nextRingTime <= currentTime) {
-            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
-                "Next ring time is not in the future: id=$alarmId, time=$nextRingTime, current=$currentTime")
-            // Allow small time differences (up to 1 second) due to processing delays
-            if (nextRingTime < currentTime - 1000) {
-                throw IllegalArgumentException("Next ring time must be in the future")
-            }
-        }
+        // Check permissions before attempting to schedule
+        validateSchedulingPermissions()
         
-        try {
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra(EXTRA_ALARM_ID, alarmId)
-            }
-            
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                alarmId.toInt(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
-            
-            // Use setExactAndAllowWhileIdle for API 23+ to ensure alarms fire in Doze mode
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    nextRingTime,
-                    pendingIntent
-                )
-            } else {
-                alarmManager.setExact(
-                    AlarmManager.RTC_WAKEUP,
-                    nextRingTime,
-                    pendingIntent
-                )
-            }
-            
-            Log.d(TAG, "Alarm scheduled for ${LocalDateTime.ofInstant(
-                java.time.Instant.ofEpochMilli(nextRingTime), 
-                ZoneId.systemDefault()
-            )}")
-            
-            appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
-                "Successfully scheduled alarm: id=$alarmId")
-        } catch (e: SecurityException) {
-            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
-                "Security exception scheduling alarm: id=$alarmId", e)
-            throw com.lettingin.intervalAlarm.util.SchedulingException(
-                "Permission denied to schedule exact alarm", e)
-        } catch (e: Exception) {
-            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
-                "Failed to schedule alarm: id=$alarmId", e)
-            throw com.lettingin.intervalAlarm.util.SchedulingException(
-                "Failed to schedule alarm", e)
-        }
+        // Validate next ring time
+        validateNextRingTime(nextRingTime, alarmId)
+        
+        // Schedule with retry logic
+        scheduleWithRetry(alarmId, nextRingTime)
     }
 
     override suspend fun cancelAlarm(alarmId: Long) {
@@ -384,30 +331,58 @@ class AlarmSchedulerImpl @Inject constructor(
     }
 
     private suspend fun scheduleResume(alarmId: Long, resumeTime: Long) {
-        val intent = Intent(context, AlarmReceiver::class.java).apply {
-            putExtra(EXTRA_ALARM_ID, alarmId)
-            putExtra(EXTRA_IS_RESUME, true)
+        // Validate inputs
+        if (resumeTime <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid resume time: $resumeTime for alarm $alarmId")
+            throw IllegalArgumentException("Resume time must be positive")
         }
         
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            alarmId.toInt() + 100000, // Different request code for resume
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        // Check permissions
+        validateSchedulingPermissions()
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.RTC_WAKEUP,
-                resumeTime,
-                pendingIntent
+        // Validate resume time
+        validateNextRingTime(resumeTime, alarmId)
+        
+        try {
+            val intent = Intent(context, AlarmReceiver::class.java).apply {
+                putExtra(EXTRA_ALARM_ID, alarmId)
+                putExtra(EXTRA_IS_RESUME, true)
+            }
+            
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                alarmId.toInt() + 100000, // Different request code for resume
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-        } else {
-            alarmManager.setExact(
-                AlarmManager.RTC_WAKEUP,
-                resumeTime,
-                pendingIntent
-            )
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    resumeTime,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    resumeTime,
+                    pendingIntent
+                )
+            }
+            
+            appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Successfully scheduled resume: id=$alarmId, time=$resumeTime")
+        } catch (e: SecurityException) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Security exception scheduling resume: id=$alarmId", e)
+            throw com.lettingin.intervalAlarm.util.SchedulingException(
+                "Permission denied to schedule alarm resume", e)
+        } catch (e: Exception) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Failed to schedule resume: id=$alarmId", e)
+            throw com.lettingin.intervalAlarm.util.SchedulingException(
+                "Failed to schedule alarm resume", e)
         }
     }
 
@@ -515,6 +490,174 @@ class AlarmSchedulerImpl @Inject constructor(
             Log.d(TAG, "getScheduledTime: alarmId=$alarmId is not scheduled")
             null
         }
+    }
+
+    /**
+     * Validates that required permissions are granted for alarm scheduling.
+     * @throws SchedulingException if critical permissions are missing
+     */
+    private fun validateSchedulingPermissions() {
+        if (!permissionChecker.isExactAlarmPermissionGranted()) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Exact alarm permission not granted")
+            throw com.lettingin.intervalAlarm.util.SchedulingException(
+                "Exact alarm permission is required to schedule alarms")
+        }
+        
+        if (!permissionChecker.isNotificationPermissionGranted()) {
+            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Notification permission not granted - alarms may not be visible")
+        }
+    }
+    
+    /**
+     * Validates alarm configuration before scheduling.
+     * @throws IllegalArgumentException if configuration is invalid
+     */
+    private fun validateAlarmConfiguration(alarm: IntervalAlarm) {
+        if (alarm.selectedDays.isEmpty()) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Cannot schedule alarm with no selected days: id=${alarm.id}")
+            throw IllegalArgumentException("Alarm must have at least one selected day")
+        }
+        
+        if (alarm.intervalMinutes < MIN_INTERVAL_MINUTES) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Cannot schedule alarm with interval too small: id=${alarm.id}, interval=${alarm.intervalMinutes}")
+            throw IllegalArgumentException("Alarm interval must be at least $MIN_INTERVAL_MINUTES minute(s)")
+        }
+        
+        if (alarm.intervalMinutes > MAX_INTERVAL_MINUTES) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Cannot schedule alarm with interval too large: id=${alarm.id}, interval=${alarm.intervalMinutes}")
+            throw IllegalArgumentException("Alarm interval must not exceed $MAX_INTERVAL_MINUTES minutes")
+        }
+        
+        // Validate time window
+        if (alarm.startTime >= alarm.endTime) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid time window: id=${alarm.id}, start=${alarm.startTime}, end=${alarm.endTime}")
+            throw IllegalArgumentException("Alarm start time must be before end time")
+        }
+        
+        // Validate that at least one interval fits in the time window
+        val windowMinutes = java.time.Duration.between(alarm.startTime, alarm.endTime).toMinutes()
+        if (windowMinutes < alarm.intervalMinutes) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Time window too small for interval: id=${alarm.id}, window=${windowMinutes}min, interval=${alarm.intervalMinutes}min")
+            throw IllegalArgumentException("Time window must be at least as long as the interval")
+        }
+    }
+    
+    /**
+     * Validates that the calculated next ring time is valid.
+     * @throws IllegalArgumentException if next ring time is invalid
+     */
+    private fun validateNextRingTime(nextRingTime: Long, alarmId: Long) {
+        val currentTime = System.currentTimeMillis()
+        
+        // Check if in the future (allow small tolerance for processing delays)
+        if (nextRingTime < currentTime - 1000) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Next ring time is in the past: id=$alarmId, time=$nextRingTime, current=$currentTime")
+            throw IllegalArgumentException("Next ring time must be in the future")
+        }
+        
+        // Check if not too far in the future (prevent overflow/miscalculation)
+        val maxFutureTime = currentTime + (MAX_FUTURE_TIME_YEARS * 365L * 24L * 60L * 60L * 1000L)
+        if (nextRingTime > maxFutureTime) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Next ring time is too far in future: id=$alarmId, time=$nextRingTime, max=$maxFutureTime")
+            throw IllegalArgumentException("Next ring time exceeds maximum allowed future time")
+        }
+        
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+            "Next ring time validated: id=$alarmId, time=$nextRingTime")
+    }
+    
+    /**
+     * Schedules an alarm with retry logic for transient failures.
+     * @throws SchedulingException if all retry attempts fail
+     */
+    private suspend fun scheduleWithRetry(alarmId: Long, nextRingTime: Long) {
+        var lastException: Exception? = null
+        
+        repeat(MAX_RETRY_ATTEMPTS) { attempt ->
+            try {
+                scheduleAlarmInternal(alarmId, nextRingTime)
+                
+                // Verify the alarm was actually scheduled
+                if (isAlarmScheduled(alarmId)) {
+                    appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                        "Successfully scheduled alarm: id=$alarmId, attempt=${attempt + 1}")
+                    return
+                } else {
+                    appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                        "Alarm scheduling verification failed: id=$alarmId, attempt=${attempt + 1}")
+                    lastException = com.lettingin.intervalAlarm.util.SchedulingException(
+                        "Alarm was not scheduled (verification failed)")
+                }
+            } catch (e: SecurityException) {
+                // Don't retry permission errors
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                    "Security exception scheduling alarm: id=$alarmId", e)
+                throw com.lettingin.intervalAlarm.util.SchedulingException(
+                    "Permission denied to schedule exact alarm", e)
+            } catch (e: Exception) {
+                lastException = e
+                appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                    "Failed to schedule alarm (attempt ${attempt + 1}/$MAX_RETRY_ATTEMPTS): id=$alarmId", e)
+                
+                // Wait before retrying (except on last attempt)
+                if (attempt < MAX_RETRY_ATTEMPTS - 1) {
+                    kotlinx.coroutines.delay(RETRY_DELAY_MS)
+                }
+            }
+        }
+        
+        // All retries failed
+        appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+            "Failed to schedule alarm after $MAX_RETRY_ATTEMPTS attempts: id=$alarmId", lastException)
+        throw com.lettingin.intervalAlarm.util.SchedulingException(
+            "Failed to schedule alarm after $MAX_RETRY_ATTEMPTS attempts", lastException)
+    }
+    
+    /**
+     * Internal method that performs the actual AlarmManager scheduling.
+     * @throws Exception if scheduling fails
+     */
+    private fun scheduleAlarmInternal(alarmId: Long, nextRingTime: Long) {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            putExtra(EXTRA_ALARM_ID, alarmId)
+        }
+        
+        val pendingIntent = PendingIntent.getBroadcast(
+            context,
+            alarmId.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        
+        // Use setExactAndAllowWhileIdle for API 23+ to ensure alarms fire in Doze mode
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(
+                AlarmManager.RTC_WAKEUP,
+                nextRingTime,
+                pendingIntent
+            )
+        } else {
+            alarmManager.setExact(
+                AlarmManager.RTC_WAKEUP,
+                nextRingTime,
+                pendingIntent
+            )
+        }
+        
+        val nextRingDateTime = LocalDateTime.ofInstant(
+            java.time.Instant.ofEpochMilli(nextRingTime), 
+            ZoneId.systemDefault()
+        )
+        Log.d(TAG, "Alarm scheduled for $nextRingDateTime")
     }
 
     /**

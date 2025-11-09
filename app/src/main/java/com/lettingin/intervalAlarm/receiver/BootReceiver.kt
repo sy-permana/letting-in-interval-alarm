@@ -9,6 +9,9 @@ import com.lettingin.intervalAlarm.data.repository.AlarmRepository
 import com.lettingin.intervalAlarm.data.repository.AlarmStateRepository
 import com.lettingin.intervalAlarm.domain.scheduler.AlarmScheduler
 import com.lettingin.intervalAlarm.domain.scheduler.AlarmSchedulerImpl
+import com.lettingin.intervalAlarm.util.AlarmStateRecoveryManager
+import com.lettingin.intervalAlarm.util.AlarmStateValidator
+import com.lettingin.intervalAlarm.util.AppLogger
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +75,18 @@ class BootReceiver : BroadcastReceiver() {
                         entryPoint.alarmScheduler()
                     )
                 }
+                
+                // Post-restoration validation: verify alarm is actually scheduled
+                if (validationResult.activeAlarmFound) {
+                    validateRestoredAlarm(
+                        entryPoint.alarmRepository(),
+                        entryPoint.alarmStateRepository(),
+                        entryPoint.alarmScheduler(),
+                        entryPoint.alarmStateValidator(),
+                        entryPoint.alarmStateRecoveryManager(),
+                        appLogger
+                    )
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Error restoring alarm after boot", e)
                 entryPoint.appLogger().e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
@@ -79,6 +94,83 @@ class BootReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
+        }
+    }
+
+    /**
+     * Validates that the restored alarm is actually scheduled in AlarmManager
+     * and has a valid next ring time. Performs recovery if validation fails.
+     */
+    private suspend fun validateRestoredAlarm(
+        alarmRepository: AlarmRepository,
+        alarmStateRepository: AlarmStateRepository,
+        alarmScheduler: AlarmScheduler,
+        alarmStateValidator: AlarmStateValidator,
+        alarmStateRecoveryManager: AlarmStateRecoveryManager,
+        appLogger: AppLogger
+    ) {
+        try {
+            appLogger.i(AlarmStateValidator.CATEGORY_STATE_VALIDATION, TAG,
+                "Starting post-boot validation of restored alarm")
+            
+            // Get active alarm
+            val activeAlarm = alarmRepository.getActiveAlarm().firstOrNull()
+            if (activeAlarm == null) {
+                appLogger.d(AlarmStateValidator.CATEGORY_STATE_VALIDATION, TAG,
+                    "No active alarm found during post-boot validation")
+                return
+            }
+            
+            // Get alarm state
+            val alarmState = alarmStateRepository.getAlarmStateSync(activeAlarm.id)
+            
+            // Validate the alarm state
+            val validationResult = alarmStateValidator.validateAlarmState(activeAlarm, alarmState)
+            
+            if (!validationResult.isValid) {
+                appLogger.w(AlarmStateValidator.CATEGORY_STATE_VALIDATION, TAG,
+                    "Post-boot validation failed: alarmId=${activeAlarm.id}, " +
+                    "issues=${validationResult.issues}, action=${validationResult.suggestedAction}")
+                
+                // Attempt recovery
+                appLogger.i(AlarmStateRecoveryManager.CATEGORY_STATE_RECOVERY, TAG,
+                    "Attempting recovery for failed post-boot validation: alarmId=${activeAlarm.id}")
+                
+                val recoveryResult = alarmStateRecoveryManager.recoverAlarmState(activeAlarm.id)
+                
+                if (recoveryResult.success) {
+                    appLogger.i(AlarmStateRecoveryManager.CATEGORY_STATE_RECOVERY, TAG,
+                        "Post-boot recovery successful: alarmId=${activeAlarm.id}, " +
+                        "action='${recoveryResult.action}', newNextRingTime=${recoveryResult.newNextRingTime}")
+                } else {
+                    appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                        "Post-boot recovery failed: alarmId=${activeAlarm.id}, " +
+                        "action='${recoveryResult.action}'", recoveryResult.error)
+                }
+            } else {
+                appLogger.i(AlarmStateValidator.CATEGORY_STATE_VALIDATION, TAG,
+                    "Post-boot validation successful: alarmId=${activeAlarm.id}, " +
+                    "nextRingTime=${alarmState?.nextScheduledRingTime}")
+                
+                // Even if validation passed, verify alarm is actually scheduled in AlarmManager
+                if (alarmState != null && !alarmState.isPaused && !alarmState.isStoppedForDay) {
+                    val isScheduled = alarmScheduler.isAlarmScheduled(activeAlarm.id)
+                    if (!isScheduled) {
+                        appLogger.w(AlarmStateValidator.CATEGORY_STATE_VALIDATION, TAG,
+                            "Alarm passed validation but not scheduled in AlarmManager: alarmId=${activeAlarm.id}")
+                        
+                        // Reschedule it
+                        alarmState.nextScheduledRingTime?.let { nextRingTime ->
+                            appLogger.i(AlarmStateRecoveryManager.CATEGORY_STATE_RECOVERY, TAG,
+                                "Rescheduling alarm in AlarmManager: alarmId=${activeAlarm.id}, nextRingTime=$nextRingTime")
+                            alarmScheduler.scheduleNextRing(activeAlarm.id, nextRingTime)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Error during post-boot validation", e)
         }
     }
 
@@ -144,6 +236,16 @@ class BootReceiver : BroadcastReceiver() {
             )
 
             if (nextRingTime != null) {
+                // Validate that the calculated next ring time is valid (not in the past)
+                if (nextRingTime < currentTimeMillis) {
+                    Log.w(TAG, "Calculated next ring time is in the past: $nextRingTime, current: $currentTimeMillis")
+                    // If one-cycle mode and no more valid times, deactivate
+                    if (!activeAlarm.isRepeatable) {
+                        alarmRepository.deactivateAlarm(activeAlarm.id)
+                    }
+                    return
+                }
+                
                 alarmScheduler.scheduleNextRing(activeAlarm.id, nextRingTime)
                 
                 // Update alarm state
@@ -168,6 +270,13 @@ class BootReceiver : BroadcastReceiver() {
                     )
                     alarmStateRepository.updateAlarmState(newState)
                 }
+                
+                Log.d(TAG, "Alarm scheduled for next valid time: ${
+                    LocalDateTime.ofInstant(
+                        java.time.Instant.ofEpochMilli(nextRingTime),
+                        ZoneId.systemDefault()
+                    )
+                }")
             } else {
                 Log.w(TAG, "No valid next ring time found")
                 // If one-cycle mode and no more valid times, deactivate
@@ -187,6 +296,28 @@ class BootReceiver : BroadcastReceiver() {
         )
 
         if (nextRingTime != null) {
+            // Validate that the calculated next ring time is valid (not in the past)
+            if (nextRingTime < currentTimeMillis) {
+                Log.w(TAG, "Calculated next ring time is in the past: $nextRingTime, current: $currentTimeMillis")
+                // This shouldn't happen, but if it does, don't schedule it
+                return
+            }
+            
+            // Validate that next ring time is within alarm's time window
+            val nextRingDateTime = LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(nextRingTime),
+                ZoneId.systemDefault()
+            )
+            val isValidNextDay = activeAlarm.selectedDays.contains(nextRingDateTime.dayOfWeek)
+            val ringTime = nextRingDateTime.toLocalTime()
+            val isWithinNextWindow = ringTime >= activeAlarm.startTime && ringTime <= activeAlarm.endTime
+            
+            if (!isValidNextDay || !isWithinNextWindow) {
+                Log.w(TAG, "Calculated next ring time is outside valid window: day=$isValidNextDay, time=$isWithinNextWindow")
+                // This shouldn't happen, but if it does, don't schedule it
+                return
+            }
+            
             alarmScheduler.scheduleNextRing(activeAlarm.id, nextRingTime)
             
             // Update alarm state
@@ -240,5 +371,7 @@ interface BootReceiverEntryPoint {
     fun alarmStateRepository(): AlarmStateRepository
     fun alarmScheduler(): AlarmScheduler
     fun rebootValidator(): com.lettingin.intervalAlarm.util.RebootValidator
+    fun alarmStateValidator(): AlarmStateValidator
+    fun alarmStateRecoveryManager(): AlarmStateRecoveryManager
     fun appLogger(): com.lettingin.intervalAlarm.util.AppLogger
 }
