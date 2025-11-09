@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 import java.time.DayOfWeek
 import java.time.LocalTime
 import javax.inject.Inject
@@ -78,21 +79,31 @@ class AlarmEditorViewModel @Inject constructor(
         )
     }
 
+    // Job for alarm loading collector
+    private var loadAlarmJob: kotlinx.coroutines.Job? = null
+
     /**
      * Load an existing alarm for editing or apply user settings to new alarm
      */
     fun loadAlarm(alarmId: Long?) {
-        viewModelScope.launch {
+        // Cancel previous load job to prevent leaks
+        loadAlarmJob?.cancel()
+        
+        loadAlarmJob = viewModelScope.launch {
             try {
                 if (alarmId != null) {
                     // Load existing alarm - show loading state
                     _isLoading.value = true
                     android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Loading alarm $alarmId")
-                    alarmRepository.getAlarmById(alarmId).collect { alarm ->
-                        _alarmState.value = alarm
-                        recalculateMaxInterval()
-                        _isLoading.value = false
-                        android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Successfully loaded alarm $alarmId")
+                    
+                    // Use withTimeout to prevent hanging
+                    kotlinx.coroutines.withTimeout(5000L) {
+                        alarmRepository.getAlarmById(alarmId).collect { alarm ->
+                            _alarmState.value = alarm
+                            recalculateMaxInterval()
+                            _isLoading.value = false
+                            android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Successfully loaded alarm $alarmId")
+                        }
                     }
                 } else {
                     // For new alarms, apply user's default settings if available
@@ -106,6 +117,13 @@ class AlarmEditorViewModel @Inject constructor(
                     }
                     recalculateMaxInterval()
                 }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                android.util.Log.e("AlarmEditorViewModel", "loadAlarm: Timeout loading alarm $alarmId", e)
+                _isLoading.value = false
+                _validationResult.value = ValidationResult(
+                    isValid = false,
+                    errors = mapOf("general" to "Loading alarm timed out")
+                )
             } catch (e: Exception) {
                 android.util.Log.e("AlarmEditorViewModel", "loadAlarm: Failed to load alarm $alarmId", e)
                 _isLoading.value = false
@@ -351,6 +369,12 @@ class AlarmEditorViewModel @Inject constructor(
         _validationResult.value = ValidationResult(isValid = true)
     }
 
+    // Job for test alarm cleanup
+    private var testAlarmCleanupJob: kotlinx.coroutines.Job? = null
+    
+    // Job for ringtone preview
+    private var ringtonePreviewJob: kotlinx.coroutines.Job? = null
+
     /**
      * Test alarm - triggers alarm in 5 seconds for testing purposes
      */
@@ -449,9 +473,10 @@ class AlarmEditorViewModel @Inject constructor(
                 }
 
                 // Schedule cleanup of test alarm after 10 seconds
-                viewModelScope.launch {
-                    kotlinx.coroutines.delay(10000)
+                testAlarmCleanupJob?.cancel()
+                testAlarmCleanupJob = viewModelScope.launch {
                     try {
+                        kotlinx.coroutines.delay(10000)
                         alarmRepository.deleteAlarm(testAlarmId)
                         android.util.Log.d("AlarmEditorViewModel", "testAlarm: Cleaned up test alarm $testAlarmId")
                     } catch (e: Exception) {
@@ -478,7 +503,10 @@ class AlarmEditorViewModel @Inject constructor(
      * Preview ringtone - plays selected ringtone for 3 seconds
      */
     fun previewRingtone(context: android.content.Context) {
-        viewModelScope.launch {
+        // Cancel previous preview to prevent overlapping sounds
+        ringtonePreviewJob?.cancel()
+        
+        ringtonePreviewJob = viewModelScope.launch {
             try {
                 android.util.Log.d("AlarmEditorViewModel", "previewRingtone: Starting ringtone preview")
                 val alarm = _alarmState.value
@@ -503,5 +531,18 @@ class AlarmEditorViewModel @Inject constructor(
                 )
             }
         }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Cancel all ongoing jobs
+        loadAlarmJob?.cancel()
+        testAlarmCleanupJob?.cancel()
+        ringtonePreviewJob?.cancel()
+        
+        // Cancel all child coroutines in viewModelScope
+        viewModelScope.coroutineContext.cancelChildren()
+        
+        android.util.Log.d("AlarmEditorViewModel", "onCleared: Cancelled all jobs and child coroutines")
     }
 }

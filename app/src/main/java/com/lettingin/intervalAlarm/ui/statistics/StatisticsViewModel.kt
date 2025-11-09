@@ -8,7 +8,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
@@ -25,25 +31,46 @@ data class FormattedStatistics(
     val autoDismissalRate: String
 )
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
     private val statisticsRepository: StatisticsRepository,
     private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
 ) : ViewModel() {
 
-    // StateFlow for alarm statistics (last 5 cycles)
-    private val _statistics = MutableStateFlow<List<AlarmCycleStatistics>>(emptyList())
-    val statistics: StateFlow<List<AlarmCycleStatistics>> = _statistics.asStateFlow()
+    // Current alarm ID being viewed
+    private val _currentAlarmId = MutableStateFlow<Long?>(null)
+    
+    // StateFlow for alarm statistics (last 5 cycles) - optimized with shared upstream
+    val statistics: StateFlow<List<AlarmCycleStatistics>> = _currentAlarmId
+        .flatMapLatest { alarmId ->
+            if (alarmId != null) {
+                statisticsRepository.getStatisticsForAlarm(alarmId)
+                    .map { it.take(5) } // Keep only last 5 cycles
+            } else {
+                kotlinx.coroutines.flow.flowOf(emptyList())
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-    // StateFlow for formatted statistics
-    private val _formattedStatistics = MutableStateFlow<List<FormattedStatistics>>(emptyList())
-    val formattedStatistics: StateFlow<List<FormattedStatistics>> = _formattedStatistics.asStateFlow()
+    // StateFlow for formatted statistics - derived from statistics
+    val formattedStatistics: StateFlow<List<FormattedStatistics>> = statistics
+        .map { formatStatistics(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
     // Error state
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
-    // Loading state
+    // Loading state - derived from whether we have an alarm ID set
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
@@ -51,21 +78,29 @@ class StatisticsViewModel @Inject constructor(
      * Load statistics for a specific alarm
      */
     fun loadStatistics(alarmId: Long) {
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+            "StatisticsViewModel", "Loading statistics for alarm $alarmId")
+        
+        _isLoading.value = true
+        _currentAlarmId.value = alarmId
+        
+        // Loading state will be cleared when statistics flow emits
         viewModelScope.launch {
-            _isLoading.value = true
             try {
-                appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
-                    "StatisticsViewModel", "Loading statistics for alarm $alarmId")
-                statisticsRepository.getStatisticsForAlarm(alarmId).collect { stats ->
-                    _statistics.value = stats.take(5) // Keep only last 5 cycles
-                    _formattedStatistics.value = formatStatistics(stats.take(5))
+                // Wait for first emission with timeout
+                kotlinx.coroutines.withTimeout(5000L) {
+                    statistics.first { it.isNotEmpty() || _currentAlarmId.value != alarmId }
                     _isLoading.value = false
                     appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
-                        "StatisticsViewModel", "Loaded ${stats.size} statistics entries")
+                        "StatisticsViewModel", "Statistics loaded successfully")
                 }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+                    "StatisticsViewModel", "Statistics loading timed out, but flow will continue")
+                _isLoading.value = false
             } catch (e: Exception) {
                 appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
-                    "StatisticsViewModel", "Failed to load statistics for alarm $alarmId", e)
+                    "StatisticsViewModel", "Error loading statistics", e)
                 _errorMessage.value = "Failed to load statistics: ${e.message}"
                 _isLoading.value = false
             }
@@ -109,5 +144,15 @@ class StatisticsViewModel @Inject constructor(
      */
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        
+        // Cancel all child coroutines in viewModelScope
+        viewModelScope.coroutineContext.cancelChildren()
+        
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+            "StatisticsViewModel", "ViewModel cleared, cancelled all child coroutines")
     }
 }
