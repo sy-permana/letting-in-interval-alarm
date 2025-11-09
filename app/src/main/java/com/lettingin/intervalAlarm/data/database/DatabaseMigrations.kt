@@ -19,21 +19,21 @@ object DatabaseMigrations {
      * - Index on alarm_statistics.cycleDate (for querying recent statistics)
      */
     val MIGRATION_1_2 = object : Migration(1, 2) {
-        override fun migrate(database: SupportSQLiteDatabase) {
+        override fun migrate(db: SupportSQLiteDatabase) {
             // Add index on interval_alarms.isActive
-            database.execSQL(
+            db.execSQL(
                 "CREATE INDEX IF NOT EXISTS index_interval_alarms_isActive " +
                 "ON interval_alarms(isActive)"
             )
             
             // Add index on alarm_statistics.alarmId
-            database.execSQL(
+            db.execSQL(
                 "CREATE INDEX IF NOT EXISTS index_alarm_statistics_alarmId " +
                 "ON alarm_statistics(alarmId)"
             )
             
             // Add index on alarm_statistics.cycleDate
-            database.execSQL(
+            db.execSQL(
                 "CREATE INDEX IF NOT EXISTS index_alarm_statistics_cycleDate " +
                 "ON alarm_statistics(cycleDate)"
             )

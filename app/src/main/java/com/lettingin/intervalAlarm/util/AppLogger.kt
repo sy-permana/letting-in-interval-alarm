@@ -38,6 +38,7 @@ class AppLogger @Inject constructor(
         const val CATEGORY_UI = "UI"
         const val CATEGORY_SYSTEM = "SYSTEM"
         const val CATEGORY_ERROR = "ERROR"
+        const val CATEGORY_STATE_TRANSITION = "STATE_TRANSITION"
     }
     
     data class LogEntry(

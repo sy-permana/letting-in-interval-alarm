@@ -52,7 +52,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             notificationPermissionLauncher = registerForActivityResult(
                 ActivityResultContracts.RequestPermission()
-            ) { isGranted ->
+            ) { _ ->
                 // Permission result is handled by the ViewModel/UI
                 // This is just for registration
             }

@@ -488,10 +488,10 @@ fun AlarmEditorScreen(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            val context = androidx.compose.ui.platform.LocalContext.current
+                            val testContext = androidx.compose.ui.platform.LocalContext.current
                             
                             OutlinedButton(
-                                onClick = { viewModel.testAlarm(context) },
+                                onClick = { viewModel.testAlarm(testContext) },
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Column(

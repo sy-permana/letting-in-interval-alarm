@@ -164,8 +164,10 @@ class AlarmStateRecoveryManager @Inject constructor(
         alarmState: com.lettingin.intervalAlarm.data.model.AlarmState?,
         issues: List<ValidationIssue>
     ): RecoveryResult {
+        val recalcStartTime = System.currentTimeMillis()
         appLogger.i(CATEGORY_STATE_RECOVERY, TAG, 
-            "Recalculating and rescheduling: alarmId=${alarm.id}, issues=$issues")
+            "Starting recalculation: alarmId=${alarm.id}, issues=$issues, " +
+            "oldNextRingTime=${alarmState?.nextScheduledRingTime}, timestamp=$recalcStartTime")
         
         return try {
             val currentTime = System.currentTimeMillis()
@@ -208,9 +210,11 @@ class AlarmStateRecoveryManager @Inject constructor(
             // Reschedule with AlarmManager
             alarmScheduler.scheduleNextRing(alarm.id, newNextRingTime)
             
+            val recalcDuration = System.currentTimeMillis() - recalcStartTime
             appLogger.i(CATEGORY_STATE_RECOVERY, TAG, 
                 "Successfully recalculated and rescheduled: alarmId=${alarm.id}, " +
-                "newNextRingTime=$newNextRingTime")
+                "oldNextRingTime=${alarmState?.nextScheduledRingTime}, " +
+                "newNextRingTime=$newNextRingTime, duration=${recalcDuration}ms")
             
             RecoveryResult(
                 success = true,

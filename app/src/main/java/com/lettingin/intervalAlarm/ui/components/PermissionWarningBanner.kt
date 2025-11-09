@@ -22,7 +22,6 @@ fun PermissionWarningBanner(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val missingPermissions = remember(permissionChecker) {
         permissionChecker.getMissingCriticalPermissions()
     }

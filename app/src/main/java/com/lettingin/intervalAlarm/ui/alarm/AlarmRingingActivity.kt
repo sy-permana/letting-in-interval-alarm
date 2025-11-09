@@ -48,20 +48,24 @@ class AlarmRingingActivity : ComponentActivity() {
             // Android 8.1+
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+        } else {
+            // For older Android versions, use deprecated flags
+            @Suppress("DEPRECATION")
+            window.addFlags(
+                android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            )
         }
         
-        // These flags work on all Android versions
-        window.addFlags(
-            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
-            android.view.WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-            android.view.WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-            android.view.WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-        )
+        // Keep screen on flag works on all versions
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Acquire wake lock to ensure screen turns on
         // Note: Window flags handle most of the screen wake, this is a backup
         try {
             val powerManager = getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+            @Suppress("DEPRECATION")
             wakeLock = powerManager.newWakeLock(
                 android.os.PowerManager.SCREEN_DIM_WAKE_LOCK or  // Use DIM instead of BRIGHT for battery savings
                 android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,

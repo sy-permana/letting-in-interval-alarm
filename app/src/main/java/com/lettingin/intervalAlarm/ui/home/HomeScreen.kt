@@ -278,7 +278,7 @@ fun HomeScreen(
 fun ActiveAlarmCard(
     alarm: IntervalAlarm,
     alarmState: AlarmState?,
-    todayStatistics: com.lettingin.intervalAlarm.data.model.AlarmCycleStatistics?,
+    @Suppress("UNUSED_PARAMETER") todayStatistics: com.lettingin.intervalAlarm.data.model.AlarmCycleStatistics?,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onToggleActive: (Boolean) -> Unit,
@@ -761,7 +761,7 @@ fun PauseDialog(
     onDismiss: () -> Unit,
     onPause: (Long) -> Unit,
     activeAlarm: IntervalAlarm?,
-    activeAlarmState: AlarmState?
+    @Suppress("UNUSED_PARAMETER") activeAlarmState: AlarmState?
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
