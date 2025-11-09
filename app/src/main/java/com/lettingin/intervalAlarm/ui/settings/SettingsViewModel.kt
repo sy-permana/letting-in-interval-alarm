@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 import javax.inject.Inject
 
 @HiltViewModel
@@ -150,5 +151,15 @@ class SettingsViewModel @Inject constructor(
      */
     fun clearError() {
         _errorMessage.value = null
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        
+        // Cancel all child coroutines in viewModelScope
+        viewModelScope.coroutineContext.cancelChildren()
+        
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+            "SettingsViewModel", "ViewModel cleared, cancelled all child coroutines")
     }
 }

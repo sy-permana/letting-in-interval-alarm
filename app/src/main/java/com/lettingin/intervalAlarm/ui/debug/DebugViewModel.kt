@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancelChildren
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -52,6 +53,12 @@ class DebugViewModel @Inject constructor(
     
     private val _exportStatus = MutableStateFlow<String?>(null)
     val exportStatus: StateFlow<String?> = _exportStatus.asStateFlow()
+    
+    // Jobs for cancellable operations
+    private var refreshJob: kotlinx.coroutines.Job? = null
+    private var exportJob: kotlinx.coroutines.Job? = null
+    private var clearLogsJob: kotlinx.coroutines.Job? = null
+    private var simulateBootJob: kotlinx.coroutines.Job? = null
 
     init {
         appLogger.i(AppLogger.CATEGORY_UI, "DebugViewModel", "Debug screen initialized")
@@ -59,7 +66,10 @@ class DebugViewModel @Inject constructor(
     }
 
     fun refreshDebugInfo() {
-        viewModelScope.launch {
+        // Cancel previous refresh to prevent overlapping operations
+        refreshJob?.cancel()
+        
+        refreshJob = viewModelScope.launch {
             appLogger.d(AppLogger.CATEGORY_UI, "DebugViewModel", "Refreshing debug info")
             
             val currentTime = LocalDateTime.now()
@@ -115,7 +125,9 @@ class DebugViewModel @Inject constructor(
     }
 
     fun exportLogs() {
-        viewModelScope.launch {
+        exportJob?.cancel()
+        
+        exportJob = viewModelScope.launch {
             try {
                 appLogger.i(AppLogger.CATEGORY_UI, "DebugViewModel", "Exporting logs to file")
                 
@@ -129,8 +141,13 @@ class DebugViewModel @Inject constructor(
                     appLogger.e(AppLogger.CATEGORY_ERROR, "DebugViewModel", "Log export failed")
                 }
                 
-                // Clear status after 5 seconds
-                kotlinx.coroutines.delay(5000)
+                // Clear status after 5 seconds with timeout
+                kotlinx.coroutines.withTimeout(6000L) {
+                    kotlinx.coroutines.delay(5000)
+                    _exportStatus.value = null
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                // Timeout is expected, just clear status
                 _exportStatus.value = null
             } catch (e: Exception) {
                 appLogger.e(AppLogger.CATEGORY_ERROR, "DebugViewModel", "Failed to export logs", e)
@@ -140,15 +157,23 @@ class DebugViewModel @Inject constructor(
     }
     
     fun clearLogs() {
-        viewModelScope.launch {
-            appLogger.clearLogs()
-            appLogger.i(AppLogger.CATEGORY_UI, "DebugViewModel", "Logs cleared by user")
-            refreshDebugInfo()
+        clearLogsJob?.cancel()
+        
+        clearLogsJob = viewModelScope.launch {
+            try {
+                appLogger.clearLogs()
+                appLogger.i(AppLogger.CATEGORY_UI, "DebugViewModel", "Logs cleared by user")
+                refreshDebugInfo()
+            } catch (e: Exception) {
+                appLogger.e(AppLogger.CATEGORY_ERROR, "DebugViewModel", "Failed to clear logs", e)
+            }
         }
     }
 
     fun simulateBootReceiver() {
-        viewModelScope.launch {
+        simulateBootJob?.cancel()
+        
+        simulateBootJob = viewModelScope.launch {
             try {
                 appLogger.i(AppLogger.CATEGORY_SYSTEM, "DebugViewModel", "Simulating BOOT_COMPLETED broadcast")
                 
@@ -161,12 +186,30 @@ class DebugViewModel @Inject constructor(
                 
                 appLogger.i(AppLogger.CATEGORY_SYSTEM, "DebugViewModel", "Boot receiver simulation complete")
                 
-                // Refresh debug info after simulation
-                kotlinx.coroutines.delay(2000)
-                refreshDebugInfo()
+                // Refresh debug info after simulation with timeout
+                kotlinx.coroutines.withTimeout(3000L) {
+                    kotlinx.coroutines.delay(2000)
+                    refreshDebugInfo()
+                }
+            } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+                appLogger.w(AppLogger.CATEGORY_SYSTEM, "DebugViewModel", "Boot simulation refresh timed out")
             } catch (e: Exception) {
                 appLogger.e(AppLogger.CATEGORY_ERROR, "DebugViewModel", "Failed to simulate boot receiver", e)
             }
         }
+    }
+    
+    override fun onCleared() {
+        super.onCleared()
+        // Cancel all ongoing jobs
+        refreshJob?.cancel()
+        exportJob?.cancel()
+        clearLogsJob?.cancel()
+        simulateBootJob?.cancel()
+        
+        // Cancel all child coroutines in viewModelScope
+        viewModelScope.coroutineContext.cancelChildren()
+        
+        appLogger.d(AppLogger.CATEGORY_UI, "DebugViewModel", "ViewModel cleared, cancelled all jobs and child coroutines")
     }
 }
