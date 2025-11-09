@@ -28,7 +28,8 @@ class HomeViewModel @Inject constructor(
     private val alarmScheduler: AlarmScheduler,
     private val permissionChecker: com.lettingin.intervalAlarm.util.PermissionChecker,
     private val errorHandler: com.lettingin.intervalAlarm.util.ErrorHandler,
-    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger,
+    private val alarmStateRecoveryManager: com.lettingin.intervalAlarm.util.AlarmStateRecoveryManager
 ) : ViewModel() {
 
     // StateFlow for all alarms list (filtered to exclude test alarms)
@@ -81,6 +82,11 @@ class HomeViewModel @Inject constructor(
     private var todayStatisticsJob: kotlinx.coroutines.Job? = null
 
     init {
+        // Validate and recover alarm state before starting observation
+        viewModelScope.launch {
+            validateAndRecoverActiveAlarm()
+        }
+        
         // Observe active alarm and load its state and statistics
         viewModelScope.launch {
             activeAlarm.collect { alarm ->
@@ -99,6 +105,54 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Validates and recovers active alarm state on initialization.
+     * Runs with a 2-second timeout to prevent blocking UI.
+     */
+    private suspend fun validateAndRecoverActiveAlarm() {
+        try {
+            // Use withTimeout to ensure recovery completes within 2 seconds
+            kotlinx.coroutines.withTimeout(2000L) {
+                val activeAlarmValue = activeAlarm.value
+                
+                if (activeAlarmValue != null) {
+                    appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, 
+                        "HomeViewModel",
+                        "Validating and recovering active alarm: id=${activeAlarmValue.id}")
+                    
+                    val recoveryResult = alarmStateRecoveryManager.recoverAlarmState(activeAlarmValue.id)
+                    
+                    if (!recoveryResult.success) {
+                        appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                            "HomeViewModel",
+                            "Alarm state recovery failed: ${recoveryResult.action}")
+                        
+                        // Notify user of recovery failure
+                        _errorMessage.value = "Alarm state recovery issue: ${recoveryResult.action}"
+                    } else {
+                        appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM,
+                            "HomeViewModel",
+                            "Alarm state recovery successful: ${recoveryResult.action}")
+                    }
+                } else {
+                    appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM,
+                        "HomeViewModel",
+                        "No active alarm to validate")
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                "HomeViewModel",
+                "Alarm state validation timed out after 2 seconds", e)
+            _errorMessage.value = "Alarm validation took too long - please check alarm status"
+        } catch (e: Exception) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                "HomeViewModel",
+                "Error during alarm state validation", e)
+            _errorMessage.value = "Error validating alarm state: ${e.message}"
+        }
+    }
+    
     private fun loadActiveAlarmState(alarmId: Long) {
         activeAlarmStateJob = viewModelScope.launch {
             alarmStateRepository.getAlarmState(alarmId).collect { state ->

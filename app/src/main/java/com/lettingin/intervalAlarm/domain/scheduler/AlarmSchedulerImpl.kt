@@ -397,6 +397,52 @@ class AlarmSchedulerImpl @Inject constructor(
         }
     }
 
+    override fun isAlarmScheduled(alarmId: Long): Boolean {
+        return try {
+            val intent = Intent(context, AlarmReceiver::class.java).apply {
+                putExtra(EXTRA_ALARM_ID, alarmId)
+            }
+            
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                alarmId.toInt(),
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            val isScheduled = pendingIntent != null
+            
+            Log.d(TAG, "isAlarmScheduled: alarmId=$alarmId, scheduled=$isScheduled")
+            appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Alarm scheduled check: id=$alarmId, scheduled=$isScheduled")
+            
+            isScheduled
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking if alarm is scheduled: $alarmId", e)
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Error checking alarm schedule status: id=$alarmId", e)
+            false
+        }
+    }
+    
+    override fun getScheduledTime(alarmId: Long): Long? {
+        // Note: Android's AlarmManager API doesn't provide a way to retrieve the scheduled time
+        // of an existing alarm. We can only check if the PendingIntent exists.
+        // The actual scheduled time must be retrieved from the database (AlarmState).
+        
+        return if (isAlarmScheduled(alarmId)) {
+            // Return a marker value indicating the alarm is scheduled
+            // The actual time should be retrieved from AlarmState
+            Log.d(TAG, "getScheduledTime: alarmId=$alarmId is scheduled, but time must be retrieved from database")
+            appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Alarm is scheduled but time unavailable from AlarmManager: id=$alarmId")
+            -1L // Marker value indicating scheduled but time unknown
+        } else {
+            Log.d(TAG, "getScheduledTime: alarmId=$alarmId is not scheduled")
+            null
+        }
+    }
+
     /**
      * Calculate the next ring time for an alarm based on current time
      * Returns null if no valid ring time exists
