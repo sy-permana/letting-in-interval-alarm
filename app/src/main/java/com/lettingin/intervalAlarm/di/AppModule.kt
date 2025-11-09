@@ -110,9 +110,10 @@ object AppModule {
         @ApplicationContext context: Context,
         alarmRepository: AlarmRepository,
         alarmStateRepository: AlarmStateRepository,
-        appLogger: com.lettingin.intervalAlarm.util.AppLogger
+        appLogger: com.lettingin.intervalAlarm.util.AppLogger,
+        permissionChecker: com.lettingin.intervalAlarm.util.PermissionChecker
     ): AlarmScheduler {
-        return AlarmSchedulerImpl(context, alarmRepository, alarmStateRepository, appLogger)
+        return AlarmSchedulerImpl(context, alarmRepository, alarmStateRepository, appLogger, permissionChecker)
     }
     
     @Provides
