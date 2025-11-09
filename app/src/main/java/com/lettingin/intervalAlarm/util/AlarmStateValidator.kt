@@ -38,8 +38,9 @@ class AlarmStateValidator @Inject constructor(
         alarm: IntervalAlarm,
         alarmState: AlarmState?
     ): ValidationResult {
-        appLogger.d(CATEGORY_STATE_VALIDATION, TAG, 
-            "Validating alarm state: alarmId=${alarm.id}")
+        val startTime = System.currentTimeMillis()
+        appLogger.i(CATEGORY_STATE_VALIDATION, TAG, 
+            "Starting validation: alarmId=${alarm.id}, currentTime=$startTime")
         
         val issues = mutableListOf<ValidationIssue>()
         
@@ -97,9 +98,17 @@ class AlarmStateValidator @Inject constructor(
         }
         
         val isValid = issues.isEmpty()
+        val duration = System.currentTimeMillis() - startTime
+        
         appLogger.i(CATEGORY_STATE_VALIDATION, TAG, 
             "Validation complete: alarmId=${alarm.id}, valid=$isValid, " +
-            "issues=${issues.size}, action=$suggestedAction")
+            "issues=${issues.size}, issueTypes=$issues, action=$suggestedAction, duration=${duration}ms")
+        
+        // Log performance warning if validation takes too long
+        if (duration > 100) {
+            appLogger.w(AppLogger.CATEGORY_ERROR, TAG,
+                "Validation took longer than expected: ${duration}ms for alarm ${alarm.id}")
+        }
         
         return ValidationResult(
             isValid = isValid,

@@ -522,6 +522,15 @@ class AlarmSchedulerImpl @Inject constructor(
      * Returns null if no valid ring time exists
      */
     fun calculateNextRingTime(alarm: IntervalAlarm, fromTimeMillis: Long): Long? {
+        val calcStartTime = System.currentTimeMillis()
+        
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+            "Calculating next ring time: alarmId=${alarm.id}, " +
+            "fromTime=$fromTimeMillis, " +
+            "interval=${alarm.intervalMinutes}min, " +
+            "window=${alarm.startTime}-${alarm.endTime}, " +
+            "selectedDays=${alarm.selectedDays}")
+        
         // Validate inputs
         if (fromTimeMillis <= 0) {
             appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
@@ -544,25 +553,75 @@ class AlarmSchedulerImpl @Inject constructor(
         
         // Check if today is a valid day
         if (alarm.selectedDays.contains(today.dayOfWeek)) {
+            appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Today is a valid day: ${today.dayOfWeek}, currentTime=$currentTime")
+            
             // Check if we're within the time window
             if (currentTime.isBefore(alarm.startTime)) {
                 // Before start time, schedule for start time today
                 val nextRingDateTime = LocalDateTime.of(today, alarm.startTime)
-                return nextRingDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                val nextRingMillis = nextRingDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                
+                val calcDuration = System.currentTimeMillis() - calcStartTime
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                    "Calculated next ring time (before start): alarmId=${alarm.id}, " +
+                    "nextRingTime=$nextRingMillis ($nextRingDateTime), " +
+                    "reason='before start time', duration=${calcDuration}ms")
+                
+                return nextRingMillis
             } else if (currentTime.isBefore(alarm.endTime)) {
                 // Within time window, calculate next interval
                 val nextRingTime = calculateNextIntervalTime(alarm, now)
                 if (nextRingTime != null && nextRingTime.toLocalTime().isBefore(alarm.endTime)) {
-                    return nextRingTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    val nextRingMillis = nextRingTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    
+                    val calcDuration = System.currentTimeMillis() - calcStartTime
+                    appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                        "Calculated next ring time (within window): alarmId=${alarm.id}, " +
+                        "nextRingTime=$nextRingMillis ($nextRingTime), " +
+                        "reason='next interval', duration=${calcDuration}ms")
+                    
+                    return nextRingMillis
                 } else if (nextRingTime != null && nextRingTime.toLocalTime() == alarm.endTime) {
                     // Allow final ring at end time
-                    return nextRingTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    val nextRingMillis = nextRingTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    
+                    val calcDuration = System.currentTimeMillis() - calcStartTime
+                    appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                        "Calculated next ring time (at end): alarmId=${alarm.id}, " +
+                        "nextRingTime=$nextRingMillis ($nextRingTime), " +
+                        "reason='final ring at end time', duration=${calcDuration}ms")
+                    
+                    return nextRingMillis
                 }
             }
+            
+            appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "No valid time today (after end time), finding next valid day")
+        } else {
+            appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Today is not a valid day: ${today.dayOfWeek}, finding next valid day")
         }
         
         // Not valid today, find next valid day
-        return findNextValidDay(alarm, today)
+        val nextValidDay = findNextValidDay(alarm, today)
+        
+        val calcDuration = System.currentTimeMillis() - calcStartTime
+        if (nextValidDay != null) {
+            val nextDateTime = LocalDateTime.ofInstant(
+                java.time.Instant.ofEpochMilli(nextValidDay),
+                ZoneId.systemDefault()
+            )
+            appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Calculated next ring time (next day): alarmId=${alarm.id}, " +
+                "nextRingTime=$nextValidDay ($nextDateTime), " +
+                "reason='next valid day', duration=${calcDuration}ms")
+        } else {
+            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "No valid next ring time found: alarmId=${alarm.id}, duration=${calcDuration}ms")
+        }
+        
+        return nextValidDay
     }
 
     private fun calculateNextIntervalTime(alarm: IntervalAlarm, currentDateTime: LocalDateTime): LocalDateTime? {
