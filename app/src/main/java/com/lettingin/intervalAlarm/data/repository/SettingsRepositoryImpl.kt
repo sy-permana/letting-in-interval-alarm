@@ -8,26 +8,25 @@ import javax.inject.Singleton
 
 @Singleton
 class SettingsRepositoryImpl @Inject constructor(
-    private val settingsDao: SettingsDao
-) : SettingsRepository {
+    private val settingsDao: SettingsDao,
+    appLogger: com.lettingin.intervalAlarm.util.AppLogger
+) : SafeRepository(appLogger), SettingsRepository {
     
     override fun getSettings(): Flow<AppSettings?> {
         return settingsDao.getSettings()
     }
     
     override suspend fun getSettingsSync(): AppSettings? {
-        return try {
+        val result = safeDbOperation("getSettingsSync()") {
             settingsDao.getSettingsSync()
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to get settings", e)
         }
+        
+        return result.getOrElse { throw it }
     }
     
     override suspend fun updateSettings(settings: AppSettings) {
-        try {
+        safeDbOperationUnit("updateSettings()") {
             settingsDao.insertSettings(settings)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to update settings", e)
         }
     }
 }

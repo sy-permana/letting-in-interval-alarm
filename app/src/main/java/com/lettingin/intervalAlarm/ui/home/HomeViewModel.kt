@@ -28,7 +28,8 @@ class HomeViewModel @Inject constructor(
     private val alarmScheduler: AlarmScheduler,
     private val permissionChecker: com.lettingin.intervalAlarm.util.PermissionChecker,
     private val errorHandler: com.lettingin.intervalAlarm.util.ErrorHandler,
-    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger,
+    private val alarmStateRecoveryManager: com.lettingin.intervalAlarm.util.AlarmStateRecoveryManager
 ) : ViewModel() {
 
     // StateFlow for all alarms list (filtered to exclude test alarms)
@@ -83,26 +84,105 @@ class HomeViewModel @Inject constructor(
     init {
         // Observe active alarm and load its state and statistics
         viewModelScope.launch {
-            activeAlarm.collect { alarm ->
-                // Cancel previous collectors to prevent leaks
-                activeAlarmStateJob?.cancel()
-                todayStatisticsJob?.cancel()
-                
-                if (alarm != null) {
-                    loadActiveAlarmState(alarm.id)
-                    loadTodayStatistics(alarm.id)
-                } else {
-                    _activeAlarmState.value = null
-                    _todayStatistics.value = null
+            try {
+                activeAlarm.collect { alarm ->
+                    // Cancel previous collectors to prevent leaks
+                    activeAlarmStateJob?.cancel()
+                    todayStatisticsJob?.cancel()
+                    
+                    if (alarm != null) {
+                        // Validate and recover alarm state whenever active alarm changes
+                        validateAndRecoverActiveAlarm(alarm.id)
+                        
+                        loadActiveAlarmState(alarm.id)
+                        loadTodayStatistics(alarm.id)
+                    } else {
+                        _activeAlarmState.value = null
+                        _todayStatistics.value = null
+                    }
                 }
+            } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Error observing active alarm", e)
+                _errorMessage.value = "Error monitoring alarm: ${e.message}"
             }
         }
     }
 
+    /**
+     * Validates and recovers active alarm state.
+     * Runs with a 2-second timeout to prevent blocking UI.
+     * Called whenever active alarm is loaded or app resumes.
+     */
+    private suspend fun validateAndRecoverActiveAlarm(alarmId: Long) {
+        try {
+            // Use withTimeout to ensure recovery completes within 2 seconds
+            kotlinx.coroutines.withTimeout(2000L) {
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, 
+                    "HomeViewModel",
+                    "Validating and recovering active alarm: id=$alarmId")
+                
+                val recoveryResult = alarmStateRecoveryManager.recoverAlarmState(alarmId)
+                
+                if (!recoveryResult.success) {
+                    appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                        "HomeViewModel",
+                        "Alarm state recovery failed: ${recoveryResult.action}")
+                    
+                    // Notify user of recovery failure
+                    _errorMessage.value = "Alarm state recovery issue: ${recoveryResult.action}"
+                } else {
+                    appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM,
+                        "HomeViewModel",
+                        "Alarm state recovery successful: ${recoveryResult.action}")
+                    
+                    // If recovery changed the next ring time, show a brief notification
+                    if (recoveryResult.newNextRingTime != null) {
+                        val currentState = _activeAlarmState.value
+                        if (currentState?.nextScheduledRingTime != recoveryResult.newNextRingTime) {
+                            appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM,
+                                "HomeViewModel",
+                                "Next ring time updated by recovery: old=${currentState?.nextScheduledRingTime}, new=${recoveryResult.newNextRingTime}")
+                        }
+                    }
+                }
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                "HomeViewModel",
+                "Alarm state validation timed out after 2 seconds", e)
+            _errorMessage.value = "Alarm validation took too long - please check alarm status"
+        } catch (e: Exception) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                "HomeViewModel",
+                "Error during alarm state validation", e)
+            _errorMessage.value = "Error validating alarm state: ${e.message}"
+        }
+    }
+    
+    /**
+     * Public function to manually trigger validation.
+     * Can be called when app resumes or user pulls to refresh.
+     */
+    fun validateActiveAlarm() {
+        viewModelScope.launch {
+            val alarm = activeAlarm.value
+            if (alarm != null) {
+                validateAndRecoverActiveAlarm(alarm.id)
+            }
+        }
+    }
+    
     private fun loadActiveAlarmState(alarmId: Long) {
         activeAlarmStateJob = viewModelScope.launch {
-            alarmStateRepository.getAlarmState(alarmId).collect { state ->
-                _activeAlarmState.value = state
+            try {
+                alarmStateRepository.getAlarmState(alarmId).collect { state ->
+                    _activeAlarmState.value = state
+                }
+            } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Failed to load active alarm state for alarm $alarmId", e)
+                _errorMessage.value = "Failed to load alarm state: ${e.message}"
             }
         }
     }
@@ -113,6 +193,8 @@ class HomeViewModel @Inject constructor(
                 val stats = statisticsRepository.getTodayStatistics(alarmId)
                 _todayStatistics.value = stats
             } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Failed to load today statistics for alarm $alarmId", e)
                 _errorMessage.value = "Failed to load statistics: ${e.message}"
             }
         }
@@ -284,10 +366,15 @@ class HomeViewModel @Inject constructor(
     fun deleteAlarm(alarmId: Long) {
         viewModelScope.launch {
             try {
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                    "Attempting to delete alarm: id=$alarmId")
+                
                 // Check if alarm is active
                 val alarm = allAlarms.value.find { it.id == alarmId }
                 if (alarm?.isActive == true) {
                     _errorMessage.value = "Cannot delete active alarm. Please deactivate it first."
+                    appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                        "Cannot delete active alarm: id=$alarmId")
                     return@launch
                 }
 
@@ -297,7 +384,11 @@ class HomeViewModel @Inject constructor(
                 statisticsRepository.deleteStatisticsForAlarm(alarmId)
                 
                 _errorMessage.value = null
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                    "Successfully deleted alarm: id=$alarmId")
             } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Failed to delete alarm: id=$alarmId", e)
                 _errorMessage.value = "Failed to delete alarm: ${e.message}"
             }
         }
@@ -312,12 +403,18 @@ class HomeViewModel @Inject constructor(
                 val alarm = activeAlarm.value
                 if (alarm == null) {
                     _errorMessage.value = "No active alarm to pause"
+                    appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                        "Cannot pause: no active alarm")
                     return@launch
                 }
 
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                    "Pausing alarm: id=${alarm.id}, duration=${pauseDurationMillis}ms")
                 alarmScheduler.pauseAlarm(alarm.id, pauseDurationMillis)
                 _errorMessage.value = null
             } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Failed to pause alarm", e)
                 _errorMessage.value = "Failed to pause alarm: ${e.message}"
             }
         }
@@ -332,12 +429,18 @@ class HomeViewModel @Inject constructor(
                 val alarm = activeAlarm.value
                 if (alarm == null) {
                     _errorMessage.value = "No active alarm to resume"
+                    appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                        "Cannot resume: no active alarm")
                     return@launch
                 }
 
+                appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, "HomeViewModel",
+                    "Resuming alarm: id=${alarm.id}")
                 alarmScheduler.resumeAlarm(alarm.id)
                 _errorMessage.value = null
             } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "HomeViewModel",
+                    "Failed to resume alarm", e)
                 _errorMessage.value = "Failed to resume alarm: ${e.message}"
             }
         }

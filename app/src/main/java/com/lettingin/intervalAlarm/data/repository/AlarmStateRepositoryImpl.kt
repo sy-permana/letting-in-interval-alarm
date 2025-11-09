@@ -8,42 +8,37 @@ import javax.inject.Singleton
 
 @Singleton
 class AlarmStateRepositoryImpl @Inject constructor(
-    private val alarmStateDao: AlarmStateDao
-) : AlarmStateRepository {
+    private val alarmStateDao: AlarmStateDao,
+    appLogger: com.lettingin.intervalAlarm.util.AppLogger
+) : SafeRepository(appLogger), AlarmStateRepository {
     
     override fun getAlarmState(alarmId: Long): Flow<AlarmState?> {
         return alarmStateDao.getAlarmState(alarmId)
     }
     
     override suspend fun getAlarmStateSync(alarmId: Long): AlarmState? {
-        return try {
+        val result = safeDbOperation("getAlarmStateSync(alarmId=$alarmId)") {
             alarmStateDao.getAlarmStateSync(alarmId)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to get alarm state", e)
         }
+        
+        return result.getOrElse { throw it }
     }
     
     override suspend fun updateAlarmState(state: AlarmState) {
-        try {
+        safeDbOperationUnit("updateAlarmState(alarmId=${state.alarmId})") {
             alarmStateDao.insertAlarmState(state)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to update alarm state", e)
         }
     }
     
     override suspend fun deleteAlarmState(alarmId: Long) {
-        try {
+        safeDbOperationUnit("deleteAlarmState(alarmId=$alarmId)") {
             alarmStateDao.deleteAlarmState(alarmId)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to delete alarm state", e)
         }
     }
     
     override suspend fun resetDailyCounters(alarmId: Long) {
-        try {
+        safeDbOperationUnit("resetDailyCounters(alarmId=$alarmId)") {
             alarmStateDao.resetDailyCounters(alarmId)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to reset daily counters", e)
         }
     }
 }

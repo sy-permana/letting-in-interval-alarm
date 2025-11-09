@@ -27,7 +27,8 @@ data class FormattedStatistics(
 
 @HiltViewModel
 class StatisticsViewModel @Inject constructor(
-    private val statisticsRepository: StatisticsRepository
+    private val statisticsRepository: StatisticsRepository,
+    private val appLogger: com.lettingin.intervalAlarm.util.AppLogger
 ) : ViewModel() {
 
     // StateFlow for alarm statistics (last 5 cycles)
@@ -53,12 +54,18 @@ class StatisticsViewModel @Inject constructor(
         viewModelScope.launch {
             _isLoading.value = true
             try {
+                appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+                    "StatisticsViewModel", "Loading statistics for alarm $alarmId")
                 statisticsRepository.getStatisticsForAlarm(alarmId).collect { stats ->
                     _statistics.value = stats.take(5) // Keep only last 5 cycles
                     _formattedStatistics.value = formatStatistics(stats.take(5))
                     _isLoading.value = false
+                    appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_UI,
+                        "StatisticsViewModel", "Loaded ${stats.size} statistics entries")
                 }
             } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR,
+                    "StatisticsViewModel", "Failed to load statistics for alarm $alarmId", e)
                 _errorMessage.value = "Failed to load statistics: ${e.message}"
                 _isLoading.value = false
             }
