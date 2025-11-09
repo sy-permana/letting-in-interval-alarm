@@ -87,10 +87,12 @@ class AlarmEditorViewModel @Inject constructor(
                 if (alarmId != null) {
                     // Load existing alarm - show loading state
                     _isLoading.value = true
+                    android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Loading alarm $alarmId")
                     alarmRepository.getAlarmById(alarmId).collect { alarm ->
                         _alarmState.value = alarm
                         recalculateMaxInterval()
                         _isLoading.value = false
+                        android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Successfully loaded alarm $alarmId")
                     }
                 } else {
                     // For new alarms, apply user's default settings if available
@@ -100,10 +102,12 @@ class AlarmEditorViewModel @Inject constructor(
                             intervalMinutes = settings.defaultIntervalMinutes,
                             notificationType = settings.defaultNotificationType
                         )
+                        android.util.Log.d("AlarmEditorViewModel", "loadAlarm: Applied default settings")
                     }
                     recalculateMaxInterval()
                 }
             } catch (e: Exception) {
+                android.util.Log.e("AlarmEditorViewModel", "loadAlarm: Failed to load alarm $alarmId", e)
                 _isLoading.value = false
                 _validationResult.value = ValidationResult(
                     isValid = false,
@@ -262,15 +266,19 @@ class AlarmEditorViewModel @Inject constructor(
             _saveSuccess.value = false
 
             try {
+                android.util.Log.d("AlarmEditorViewModel", "saveAlarm: Starting save operation")
+                
                 // Validate alarm
                 val validation = validateAlarm()
                 if (!validation.isValid) {
+                    android.util.Log.w("AlarmEditorViewModel", "saveAlarm: Validation failed: ${validation.errors}")
                     _isLoading.value = false
                     return@launch
                 }
 
                 val alarm = _alarmState.value
                 if (alarm == null) {
+                    android.util.Log.e("AlarmEditorViewModel", "saveAlarm: No alarm data to save")
                     _validationResult.value = ValidationResult(
                         isValid = false,
                         errors = mapOf("general" to "No alarm data to save")
@@ -282,7 +290,9 @@ class AlarmEditorViewModel @Inject constructor(
                 // Check alarm count limit (max 10) for new alarms
                 if (alarm.id == 0L) {
                     val count = alarmRepository.getAlarmCount()
+                    android.util.Log.d("AlarmEditorViewModel", "saveAlarm: Current alarm count: $count")
                     if (count >= 10) {
+                        android.util.Log.w("AlarmEditorViewModel", "saveAlarm: Maximum alarm count reached")
                         _validationResult.value = ValidationResult(
                             isValid = false,
                             errors = mapOf("general" to "Maximum of 10 alarms allowed")
@@ -294,6 +304,7 @@ class AlarmEditorViewModel @Inject constructor(
 
                 // Check if trying to edit active alarm
                 if (alarm.id != 0L && alarm.isActive) {
+                    android.util.Log.w("AlarmEditorViewModel", "saveAlarm: Cannot edit active alarm ${alarm.id}")
                     _validationResult.value = ValidationResult(
                         isValid = false,
                         errors = mapOf("general" to "Cannot edit active alarm. Please deactivate it first.")
@@ -305,14 +316,18 @@ class AlarmEditorViewModel @Inject constructor(
                 // Save the alarm
                 val updatedAlarm = alarm.copy(updatedAt = System.currentTimeMillis())
                 if (alarm.id == 0L) {
+                    android.util.Log.d("AlarmEditorViewModel", "saveAlarm: Inserting new alarm")
                     alarmRepository.insertAlarm(updatedAlarm)
                 } else {
+                    android.util.Log.d("AlarmEditorViewModel", "saveAlarm: Updating alarm ${alarm.id}")
                     alarmRepository.updateAlarm(updatedAlarm)
                 }
 
                 _saveSuccess.value = true
                 _isLoading.value = false
+                android.util.Log.d("AlarmEditorViewModel", "saveAlarm: Save successful")
             } catch (e: Exception) {
+                android.util.Log.e("AlarmEditorViewModel", "saveAlarm: Failed to save alarm", e)
                 _validationResult.value = ValidationResult(
                     isValid = false,
                     errors = mapOf("general" to "Failed to save alarm: ${e.message}")
@@ -465,18 +480,23 @@ class AlarmEditorViewModel @Inject constructor(
     fun previewRingtone(context: android.content.Context) {
         viewModelScope.launch {
             try {
+                android.util.Log.d("AlarmEditorViewModel", "previewRingtone: Starting ringtone preview")
                 val alarm = _alarmState.value
                 if (alarm == null) {
+                    android.util.Log.w("AlarmEditorViewModel", "previewRingtone: No alarm data")
                     return@launch
                 }
 
                 val ringtoneManager = com.lettingin.intervalAlarm.util.RingtoneManagerImpl(context)
                 ringtoneManager.playRingtone(alarm.ringtoneUri, 1.0f)
+                android.util.Log.d("AlarmEditorViewModel", "previewRingtone: Playing ringtone ${alarm.ringtoneUri}")
 
                 // Stop after 3 seconds
                 kotlinx.coroutines.delay(3000)
                 ringtoneManager.stopRingtone()
+                android.util.Log.d("AlarmEditorViewModel", "previewRingtone: Stopped ringtone")
             } catch (e: Exception) {
+                android.util.Log.e("AlarmEditorViewModel", "previewRingtone: Failed", e)
                 _validationResult.value = ValidationResult(
                     isValid = false,
                     errors = mapOf("general" to "Failed to preview ringtone: ${e.message}")

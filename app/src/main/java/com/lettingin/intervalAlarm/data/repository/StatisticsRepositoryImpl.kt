@@ -9,50 +9,45 @@ import javax.inject.Singleton
 
 @Singleton
 class StatisticsRepositoryImpl @Inject constructor(
-    private val statisticsDao: StatisticsDao
-) : StatisticsRepository {
+    private val statisticsDao: StatisticsDao,
+    appLogger: com.lettingin.intervalAlarm.util.AppLogger
+) : SafeRepository(appLogger), StatisticsRepository {
     
     override fun getStatisticsForAlarm(alarmId: Long): Flow<List<AlarmCycleStatistics>> {
         return statisticsDao.getStatisticsForAlarm(alarmId, limit = 5)
     }
     
     override suspend fun insertStatistics(statistics: AlarmCycleStatistics): Long {
-        return try {
+        val result = safeDbOperation("insertStatistics(alarmId=${statistics.alarmId})") {
             statisticsDao.insertStatistics(statistics)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to insert statistics", e)
         }
+        
+        return result.getOrElse { throw it }
     }
     
     override suspend fun updateStatistics(statistics: AlarmCycleStatistics) {
-        try {
+        safeDbOperationUnit("updateStatistics(alarmId=${statistics.alarmId})") {
             statisticsDao.updateStatistics(statistics)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to update statistics", e)
         }
     }
     
     override suspend fun getTodayStatistics(alarmId: Long): AlarmCycleStatistics? {
-        return try {
+        val result = safeDbOperation("getTodayStatistics(alarmId=$alarmId)") {
             statisticsDao.getStatisticsForDate(alarmId, LocalDate.now())
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to get today's statistics", e)
         }
+        
+        return result.getOrElse { throw it }
     }
     
     override suspend fun cleanupOldStatistics(alarmId: Long, keepCount: Int) {
-        try {
+        safeDbOperationUnit("cleanupOldStatistics(alarmId=$alarmId, keepCount=$keepCount)") {
             statisticsDao.cleanupOldStatistics(alarmId, keepCount)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to cleanup old statistics", e)
         }
     }
     
     override suspend fun deleteStatisticsForAlarm(alarmId: Long) {
-        try {
+        safeDbOperationUnit("deleteStatisticsForAlarm(alarmId=$alarmId)") {
             statisticsDao.deleteStatisticsForAlarm(alarmId)
-        } catch (e: Exception) {
-            throw RepositoryException("Failed to delete statistics for alarm", e)
         }
     }
 }

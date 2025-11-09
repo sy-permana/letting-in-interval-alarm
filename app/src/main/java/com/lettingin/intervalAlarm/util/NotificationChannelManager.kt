@@ -15,8 +15,8 @@ class NotificationChannelManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
     companion object {
-        const val CHANNEL_ID_FULL_SCREEN = "alarm_full_screen"
-        const val CHANNEL_ID_POPUP = "alarm_popup"
+        const val CHANNEL_ID_FULL_SCREEN = "alarm_full_screen_v2"
+        const val CHANNEL_ID_POPUP = "alarm_popup_v2"
         const val CHANNEL_NAME_FULL_SCREEN = "Full Screen Alarms"
         const val CHANNEL_NAME_POPUP = "Popup Notifications"
         const val CHANNEL_DESCRIPTION_FULL_SCREEN = "High priority alarms that display full screen"

@@ -82,6 +82,27 @@ class MainActivity : ComponentActivity() {
         }
     }
     
+    override fun onResume() {
+        super.onResume()
+        
+        appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SYSTEM, "MainActivity",
+            "App resumed - triggering alarm state validation")
+        
+        // Trigger validation when app resumes
+        // This will be picked up by HomeViewModel through the activeAlarm flow
+        lifecycleScope.launch {
+            try {
+                // The validation will happen automatically in HomeViewModel
+                // when it observes the activeAlarm flow
+                appLogger.d(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SYSTEM, "MainActivity",
+                    "App resume validation triggered")
+            } catch (e: Exception) {
+                appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, "MainActivity",
+                    "Error during resume validation", e)
+            }
+        }
+    }
+    
     private fun runDataIntegrityCheck() {
         // Run integrity check in background using lifecycleScope
         lifecycleScope.launch(Dispatchers.IO) {

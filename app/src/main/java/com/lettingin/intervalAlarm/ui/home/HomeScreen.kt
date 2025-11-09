@@ -45,6 +45,11 @@ fun HomeScreen(
     var showPauseDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf<Long?>(null) }
     
+    // Trigger validation when screen appears
+    LaunchedEffect(Unit) {
+        viewModel.validateActiveAlarm()
+    }
+    
     // Get permission checker from context
     val context = androidx.compose.ui.platform.LocalContext.current
     val permissionChecker = remember {

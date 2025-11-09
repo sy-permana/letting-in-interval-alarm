@@ -42,6 +42,19 @@ class AlarmSchedulerImpl @Inject constructor(
         appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG, 
             "Scheduling alarm: id=${alarm.id}, label='${alarm.label}'")
         
+        // Validate alarm configuration
+        if (alarm.selectedDays.isEmpty()) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Cannot schedule alarm with no selected days: id=${alarm.id}")
+            throw IllegalArgumentException("Alarm must have at least one selected day")
+        }
+        
+        if (alarm.intervalMinutes <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Cannot schedule alarm with invalid interval: id=${alarm.id}, interval=${alarm.intervalMinutes}")
+            throw IllegalArgumentException("Alarm interval must be positive")
+        }
+        
         // Calculate the next ring time
         val nextRingTime = calculateNextRingTime(alarm, System.currentTimeMillis())
         
@@ -49,6 +62,13 @@ class AlarmSchedulerImpl @Inject constructor(
             Log.w(TAG, "No valid next ring time found for alarm ${alarm.id}")
             appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
                 "No valid next ring time found for alarm ${alarm.id}")
+            return
+        }
+        
+        // Validate next ring time is in the future
+        if (nextRingTime <= System.currentTimeMillis()) {
+            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Calculated next ring time is not in the future: id=${alarm.id}, time=$nextRingTime")
             return
         }
         
@@ -74,6 +94,30 @@ class AlarmSchedulerImpl @Inject constructor(
 
     override suspend fun scheduleNextRing(alarmId: Long, nextRingTime: Long) {
         Log.d(TAG, "scheduleNextRing: alarmId=$alarmId, nextRingTime=$nextRingTime")
+        
+        // Validate inputs
+        if (alarmId <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid alarm ID: $alarmId")
+            throw IllegalArgumentException("Alarm ID must be positive")
+        }
+        
+        if (nextRingTime <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid next ring time: $nextRingTime for alarm $alarmId")
+            throw IllegalArgumentException("Next ring time must be positive")
+        }
+        
+        // Validate next ring time is in the future
+        val currentTime = System.currentTimeMillis()
+        if (nextRingTime <= currentTime) {
+            appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+                "Next ring time is not in the future: id=$alarmId, time=$nextRingTime, current=$currentTime")
+            // Allow small time differences (up to 1 second) due to processing delays
+            if (nextRingTime < currentTime - 1000) {
+                throw IllegalArgumentException("Next ring time must be in the future")
+            }
+        }
         
         try {
             val intent = Intent(context, AlarmReceiver::class.java).apply {
@@ -154,6 +198,14 @@ class AlarmSchedulerImpl @Inject constructor(
 
     override suspend fun pauseAlarm(alarmId: Long, pauseDurationMillis: Long) {
         Log.d(TAG, "pauseAlarm: alarmId=$alarmId, duration=$pauseDurationMillis")
+        
+        // Validate inputs
+        if (pauseDurationMillis <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid pause duration: $pauseDurationMillis for alarm $alarmId")
+            throw IllegalArgumentException("Pause duration must be positive")
+        }
+        
         appLogger.logAlarmPaused(alarmId, pauseDurationMillis / 60000)
         
         val alarm = alarmRepository.getAlarmById(alarmId).firstOrNull()
@@ -251,6 +303,8 @@ class AlarmSchedulerImpl @Inject constructor(
         val currentState = alarmStateRepository.getAlarmStateSync(alarmId)
         if (currentState == null) {
             Log.e(TAG, "Alarm state not found: $alarmId")
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Alarm state not found for resume: $alarmId")
             return
         }
         
@@ -297,24 +351,36 @@ class AlarmSchedulerImpl @Inject constructor(
 
     override suspend fun stopForDay(alarmId: Long) {
         Log.d(TAG, "stopForDay: alarmId=$alarmId")
+        appLogger.i(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ALARM, TAG,
+            "Stopping alarm for day: id=$alarmId")
         
         // Cancel current alarm
         cancelAlarmOnly(alarmId)
         
         // Update state to stopped for day
         val currentState = alarmStateRepository.getAlarmStateSync(alarmId)
-        val updatedState = currentState?.copy(
+        if (currentState == null) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Alarm state not found for stopForDay: $alarmId")
+            return
+        }
+        
+        val updatedState = currentState.copy(
             isStoppedForDay = true,
             nextScheduledRingTime = null
-        ) ?: return
+        )
         
         alarmStateRepository.updateAlarmState(updatedState)
         
         // Schedule for next day
         val alarm = alarmRepository.getAlarmById(alarmId).firstOrNull()
-        if (alarm != null) {
-            scheduleNextDay(alarm)
+        if (alarm == null) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Alarm not found for stopForDay: $alarmId")
+            return
         }
+        
+        scheduleNextDay(alarm)
     }
 
     private suspend fun scheduleResume(alarmId: Long, resumeTime: Long) {
@@ -375,7 +441,14 @@ class AlarmSchedulerImpl @Inject constructor(
                 val nextRingDateTime = LocalDateTime.of(nextDate, alarm.startTime)
                 val nextRingTime = nextRingDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                 
-                val updatedState = alarmStateRepository.getAlarmStateSync(alarm.id)?.copy(
+                val currentState = alarmStateRepository.getAlarmStateSync(alarm.id)
+                if (currentState == null) {
+                    appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                        "Alarm state not found for scheduleNextDay: ${alarm.id}")
+                    return
+                }
+                
+                val updatedState = currentState.copy(
                     isStoppedForDay = false,
                     isPaused = false,
                     pauseUntilTime = null,
@@ -386,15 +459,16 @@ class AlarmSchedulerImpl @Inject constructor(
                     todayAutoDismissCount = 0
                 )
                 
-                if (updatedState != null) {
-                    alarmStateRepository.updateAlarmState(updatedState)
-                    scheduleNextRing(alarm.id, nextRingTime)
-                }
+                alarmStateRepository.updateAlarmState(updatedState)
+                scheduleNextRing(alarm.id, nextRingTime)
                 return
             }
             nextDate = nextDate.plusDays(1)
             daysChecked++
         }
+        
+        appLogger.w(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_SCHEDULING, TAG,
+            "No valid next day found for alarm: ${alarm.id}")
     }
 
     override fun isAlarmScheduled(alarmId: Long): Boolean {
@@ -448,6 +522,19 @@ class AlarmSchedulerImpl @Inject constructor(
      * Returns null if no valid ring time exists
      */
     fun calculateNextRingTime(alarm: IntervalAlarm, fromTimeMillis: Long): Long? {
+        // Validate inputs
+        if (fromTimeMillis <= 0) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "Invalid fromTimeMillis: $fromTimeMillis for alarm ${alarm.id}")
+            return null
+        }
+        
+        if (alarm.selectedDays.isEmpty()) {
+            appLogger.e(com.lettingin.intervalAlarm.util.AppLogger.CATEGORY_ERROR, TAG,
+                "No selected days for alarm ${alarm.id}")
+            return null
+        }
+        
         val now = LocalDateTime.ofInstant(
             java.time.Instant.ofEpochMilli(fromTimeMillis),
             ZoneId.systemDefault()

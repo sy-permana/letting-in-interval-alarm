@@ -186,8 +186,15 @@ class AlarmNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Get app icon as large icon for better branding
+        val largeIcon = android.graphics.BitmapFactory.decodeResource(
+            resources,
+            R.mipmap.ic_launcher
+        )
+        
         val builder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
             .setContentTitle(displayLabel)
             .setContentText("Tap to dismiss")
             .setPriority(NotificationCompat.PRIORITY_MAX) // Changed to MAX for full-screen

@@ -70,26 +70,38 @@ object AppModule {
     
     @Provides
     @Singleton
-    fun provideAlarmRepository(alarmDao: AlarmDao): AlarmRepository {
-        return AlarmRepositoryImpl(alarmDao)
+    fun provideAlarmRepository(
+        alarmDao: AlarmDao,
+        appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    ): AlarmRepository {
+        return AlarmRepositoryImpl(alarmDao, appLogger)
     }
     
     @Provides
     @Singleton
-    fun provideStatisticsRepository(statisticsDao: StatisticsDao): StatisticsRepository {
-        return StatisticsRepositoryImpl(statisticsDao)
+    fun provideStatisticsRepository(
+        statisticsDao: StatisticsDao,
+        appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    ): StatisticsRepository {
+        return StatisticsRepositoryImpl(statisticsDao, appLogger)
     }
     
     @Provides
     @Singleton
-    fun provideAlarmStateRepository(alarmStateDao: AlarmStateDao): AlarmStateRepository {
-        return AlarmStateRepositoryImpl(alarmStateDao)
+    fun provideAlarmStateRepository(
+        alarmStateDao: AlarmStateDao,
+        appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    ): AlarmStateRepository {
+        return AlarmStateRepositoryImpl(alarmStateDao, appLogger)
     }
     
     @Provides
     @Singleton
-    fun provideSettingsRepository(settingsDao: SettingsDao): SettingsRepository {
-        return SettingsRepositoryImpl(settingsDao)
+    fun provideSettingsRepository(
+        settingsDao: SettingsDao,
+        appLogger: com.lettingin.intervalAlarm.util.AppLogger
+    ): SettingsRepository {
+        return SettingsRepositoryImpl(settingsDao, appLogger)
     }
     
     @Provides

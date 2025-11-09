@@ -28,22 +28,22 @@
     - Ensure recovery completes within 2 seconds with timeout handling
     - _Requirements: 1.1, 1.2, 3.4_
 
-- [-] 3. Enhance error handling and crash prevention
-  - [ ] 3.1 Add comprehensive exception handling to ViewModels
+- [x] 3. Enhance error handling and crash prevention
+  - [x] 3.1 Add comprehensive exception handling to ViewModels
     - Wrap all coroutine launches in try-catch blocks in HomeViewModel
     - Add exception handling to AlarmEditorViewModel operations
     - Implement error state updates in UI when exceptions occur
     - Add logging for all caught exceptions with context
     - _Requirements: 2.1, 2.2, 2.5, 4.1, 4.4_
   
-  - [ ] 3.2 Implement safe database operation wrappers in repositories
+  - [x] 3.2 Implement safe database operation wrappers in repositories
     - Create SafeRepository base class with safeDbOperation() helper method
     - Update AlarmRepositoryImpl to extend SafeRepository and use safe wrappers
     - Update AlarmStateRepositoryImpl with exception handling
     - Add error logging for all database operation failures
     - _Requirements: 2.1, 2.5, 4.4_
   
-  - [ ] 3.3 Add null safety checks throughout alarm operations
+  - [x] 3.3 Add null safety checks throughout alarm operations
     - Add null checks before accessing alarm state properties
     - Use safe call operators (?.) and elvis operators (?:) for nullable values
     - Implement default values for critical operations when data is null
