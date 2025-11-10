@@ -131,28 +131,33 @@ class HomeViewModel @Inject constructor(
      * Validates and recovers active alarm state.
      * Runs with a 2-second timeout to prevent blocking UI.
      * Called whenever active alarm is loaded or app resumes.
+     * Optimized with lazy validation - only runs when active alarm exists.
      */
     private suspend fun validateAndRecoverActiveAlarm(alarmId: Long) {
         try {
             // Use withTimeout to ensure recovery completes within 2 seconds
             kotlinx.coroutines.withTimeout(2000L) {
+                val validationStartTime = System.currentTimeMillis()
+                
                 appLogger.i(AppLogger.CATEGORY_ALARM, 
                     "HomeViewModel",
-                    "Validating and recovering active alarm: id=$alarmId")
+                    "Validating and recovering active alarm: id=$alarmId, timestamp=$validationStartTime")
                 
                 val recoveryResult = alarmStateRecoveryManager.recoverAlarmState(alarmId)
+                
+                val validationDuration = System.currentTimeMillis() - validationStartTime
                 
                 if (!recoveryResult.success) {
                     appLogger.w(AppLogger.CATEGORY_ERROR,
                         "HomeViewModel",
-                        "Alarm state recovery failed: ${recoveryResult.action}")
+                        "Alarm state recovery failed: ${recoveryResult.action}, duration=${validationDuration}ms")
                     
                     // Notify user of recovery failure
                     _errorMessage.value = "Alarm state recovery issue: ${recoveryResult.action}"
                 } else {
                     appLogger.i(AppLogger.CATEGORY_ALARM,
                         "HomeViewModel",
-                        "Alarm state recovery successful: ${recoveryResult.action}")
+                        "Alarm state recovery successful: ${recoveryResult.action}, duration=${validationDuration}ms")
                     
                     // If recovery changed the next ring time, log it
                     if (recoveryResult.newNextRingTime != null) {
@@ -163,6 +168,13 @@ class HomeViewModel @Inject constructor(
                                 "Next ring time updated by recovery: old=${currentState?.nextScheduledRingTime}, new=${recoveryResult.newNextRingTime}")
                         }
                     }
+                }
+                
+                // Log performance metrics
+                if (validationDuration > 100) {
+                    appLogger.w(AppLogger.CATEGORY_ERROR,
+                        "HomeViewModel",
+                        "Validation overhead exceeded target: ${validationDuration}ms (target: <100ms)")
                 }
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {

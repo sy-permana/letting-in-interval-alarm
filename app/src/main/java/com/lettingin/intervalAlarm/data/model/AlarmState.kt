@@ -2,6 +2,7 @@ package com.lettingin.intervalAlarm.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.lettingin.intervalAlarm.util.TimeValidationUtils
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -50,5 +51,31 @@ data class AlarmState(
                             nextRingTime <= alarm.endTime
         
         return isValidDay && isWithinWindow
+    }
+    
+    /**
+     * Validates if the next scheduled ring time is within the alarm's time window.
+     * Uses TimeValidationUtils for validation.
+     */
+    fun isNextRingTimeInWindow(alarm: IntervalAlarm): Boolean {
+        val nextRing = nextScheduledRingTime ?: return true
+        return TimeValidationUtils.isTimestampInTimeWindow(nextRing, alarm)
+    }
+    
+    /**
+     * Validates if the pause until time is in the future.
+     */
+    fun isPauseTimeValid(): Boolean {
+        val pauseTime = pauseUntilTime ?: return true
+        return TimeValidationUtils.isTimestampInFuture(pauseTime)
+    }
+    
+    /**
+     * Validates if the last ring time is reasonable (not in the future).
+     */
+    fun isLastRingTimeValid(): Boolean {
+        val lastRing = lastRingTime ?: return true
+        return TimeValidationUtils.isTimestampInPast(lastRing) || 
+               TimeValidationUtils.areTimestampsClose(lastRing, System.currentTimeMillis(), 1000)
     }
 }

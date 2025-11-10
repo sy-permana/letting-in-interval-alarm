@@ -22,6 +22,7 @@ fun DebugScreen(
     viewModel: DebugViewModel = hiltViewModel()
 ) {
     val debugInfo by viewModel.debugInfo.collectAsState()
+    val validationMessage by viewModel.validationMessage.collectAsState()
 
     Scaffold(
         topBar = {
@@ -86,6 +87,80 @@ fun DebugScreen(
                         DebugItem("Today Auto Dismissals", state.todayAutoDismissCount.toString())
                     } else {
                         Text("No alarm state", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            
+            // Validation Status
+            item {
+                DebugSection(title = "State Validation") {
+                    if (debugInfo.validationStatus != null) {
+                        val validation = debugInfo.validationStatus!!
+                        DebugItem(
+                            "Status",
+                            if (validation.isValid) "✅ Valid" else "❌ Invalid",
+                            valueColor = if (validation.isValid) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.error
+                        )
+                        DebugItem("Last Validation", validation.lastValidationTime)
+                        
+                        if (validation.issues.isNotEmpty()) {
+                            Text(
+                                text = "Issues:",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                            validation.issues.forEach { issue ->
+                                Text(
+                                    text = "• $issue",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.padding(start = 8.dp)
+                                )
+                            }
+                        }
+                        
+                        DebugItem("Suggested Action", validation.suggestedAction)
+                    } else {
+                        Text("No active alarm to validate", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+            
+            // AlarmManager State Comparison
+            item {
+                DebugSection(title = "AlarmManager vs Database") {
+                    if (debugInfo.alarmManagerState != null) {
+                        val amState = debugInfo.alarmManagerState!!
+                        DebugItem(
+                            "Scheduled in AlarmManager",
+                            if (amState.isScheduled) "✅ Yes" else "❌ No",
+                            valueColor = if (amState.isScheduled) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.error
+                        )
+                        DebugItem("Scheduled Time", amState.scheduledTime ?: "N/A")
+                        DebugItem(
+                            "Matches Database",
+                            if (amState.matchesDatabase) "✅ Yes" else "❌ No",
+                            valueColor = if (amState.matchesDatabase) 
+                                MaterialTheme.colorScheme.primary 
+                            else 
+                                MaterialTheme.colorScheme.error
+                        )
+                        
+                        if (debugInfo.alarmState != null) {
+                            DebugItem(
+                                "Database Next Ring",
+                                formatTimestamp(debugInfo.alarmState!!.nextScheduledRingTime)
+                            )
+                        }
+                    } else {
+                        Text("No active alarm to compare", style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -170,6 +245,32 @@ fun DebugScreen(
             item {
                 DebugSection(title = "Debug Actions") {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        // Show validation message if present
+                        validationMessage?.let { message ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                                )
+                            ) {
+                                Text(
+                                    text = message,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(12.dp)
+                                )
+                            }
+                        }
+                        
+                        Button(
+                            onClick = { viewModel.triggerStateValidation() },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiary
+                            )
+                        ) {
+                            Text("🔍 Trigger State Validation")
+                        }
+                        
                         Button(
                             onClick = { viewModel.refreshDebugInfo() },
                             modifier = Modifier.fillMaxWidth()
