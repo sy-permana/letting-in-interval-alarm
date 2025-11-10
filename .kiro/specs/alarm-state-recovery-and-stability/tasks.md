@@ -117,22 +117,22 @@
   - Add bounds checking for time calculations
   - _Requirements: 2.1, 2.2, 2.5_
 
-- [ ] 9. Add state consistency validation helpers
+- [x] 9. Add state consistency validation helpers
   - Implement AlarmState.isNextRingTimeStale() extension method
   - Add AlarmState.isConsistent() method to validate against alarm configuration
   - Create validation utilities for time window checks
   - Add helper methods for detecting time zone and system time changes
   - _Requirements: 1.1, 1.2, 3.1_
 
-- [ ] 10. Performance optimization and testing
-  - [ ] 10.1 Optimize startup validation performance
+- [x] 10. Performance optimization and testing
+  - [x] 10.1 Optimize startup validation performance
     - Implement lazy validation that only runs when active alarm exists
     - Add caching for validation results to avoid redundant checks
     - Optimize database queries used in validation
     - Profile validation code to ensure <100ms overhead
     - _Requirements: 5.3, 5.5_
   
-  - [ ] 10.2 Add diagnostic tools for debugging
+  - [x] 10.2 Add diagnostic tools for debugging
     - Create debug screen section showing alarm state validation status
     - Add button to manually trigger state validation
     - Display last validation result and timestamp

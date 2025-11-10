@@ -29,16 +29,33 @@ class AlarmStateValidator @Inject constructor(
         private const val TAG = "AlarmStateValidator"
         const val CATEGORY_STATE_VALIDATION = "STATE_VALIDATION"
     }
+    
+    // Cache for validation results to avoid redundant checks
+    private var lastValidationResult: ValidationResult? = null
+    private var lastValidationAlarmId: Long? = null
+    private var lastValidationTime: Long = 0
+    private val validationCacheDurationMs = 5000L // Cache for 5 seconds
 
     /**
      * Validates that the displayed alarm state matches actual scheduled alarms.
      * Returns validation result with any inconsistencies found.
+     * Uses caching to avoid redundant checks within 5 seconds.
      */
     fun validateAlarmState(
         alarm: IntervalAlarm,
         alarmState: AlarmState?
     ): ValidationResult {
         val startTime = System.currentTimeMillis()
+        
+        // Check cache first to avoid redundant validation
+        if (lastValidationAlarmId == alarm.id && 
+            lastValidationResult != null &&
+            (startTime - lastValidationTime) < validationCacheDurationMs) {
+            appLogger.d(CATEGORY_STATE_VALIDATION, TAG, 
+                "Using cached validation result: alarmId=${alarm.id}, age=${startTime - lastValidationTime}ms")
+            return lastValidationResult!!
+        }
+        
         appLogger.i(CATEGORY_STATE_VALIDATION, TAG, 
             "Starting validation: alarmId=${alarm.id}, currentTime=$startTime")
         
@@ -110,11 +127,18 @@ class AlarmStateValidator @Inject constructor(
                 "Validation took longer than expected: ${duration}ms for alarm ${alarm.id}")
         }
         
-        return ValidationResult(
+        val result = ValidationResult(
             isValid = isValid,
             issues = issues,
             suggestedAction = suggestedAction
         )
+        
+        // Cache the result
+        lastValidationResult = result
+        lastValidationAlarmId = alarm.id
+        lastValidationTime = startTime
+        
+        return result
     }
 
     /**
